@@ -120,7 +120,7 @@ jours_facturables = jours_ouvrés du mois M
 - Application mobile (interface web responsive suffit)
 
 ## 7. Contraintes techniques
-- Stack : React + shadcn/ui (frontend), Hono (API), Drizzle (ORM), PostgreSQL hébergé sur Neon.
+- Stack : Next.js (React, front + back dans un seul projet) + shadcn/ui, Drizzle (ORM), PostgreSQL en local via Docker.
 - Tests automatisés obligatoires sur les règles de calcul de la section 3 (Vitest).
 - Interface en français.
 - Montants affichés en € avec séparateur de milliers (ex : 1 250 €).

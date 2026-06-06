@@ -1,0 +1,20 @@
+# Décrit les services à lancer avec Docker. Ici, une base PostgreSQL locale.
+# Pour la démarrer : docker compose up -d
+# Pour l'arrêter   : docker compose down
+
+services:
+  db:
+    image: postgres:16 # version de PostgreSQL utilisée
+    container_name: suivi-marge-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: suivi_marge
+    ports:
+      - "5432:5432" # porte 5432 de votre Mac -> porte 5432 de la base dans le conteneur
+    volumes:
+      - db_data:/var/lib/postgresql/data # garde les données même si on arrête le conteneur
+
+volumes:
+  db_data:
