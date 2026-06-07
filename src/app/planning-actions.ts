@@ -19,8 +19,13 @@ export async function affecterJours(
   }
 
   // Sécurité : la mission doit bien appartenir à ce freelance.
+  // On récupère aussi le TJM courant pour le figer sur chaque jour d'affectation.
   const [m] = await db
-    .select({ freelanceId: missions.freelanceId })
+    .select({
+      freelanceId: missions.freelanceId,
+      tjmAchat: missions.tjmAchat,
+      tjmVente: missions.tjmVente,
+    })
     .from(missions)
     .where(eq(missions.id, missionId));
   if (!m || m.freelanceId !== freelanceId) {
@@ -34,9 +39,15 @@ export async function affecterJours(
       .where(
         and(eq(affectations.freelanceId, freelanceId), inArray(affectations.date, dates))
       );
-    // ...puis on insère la nouvelle affectation.
+    // ...puis on insère la nouvelle affectation, avec le TJM recopié de la mission.
     await tx.insert(affectations).values(
-      dates.map((date) => ({ missionId, freelanceId, date }))
+      dates.map((date) => ({
+        missionId,
+        freelanceId,
+        date,
+        tjmAchat: m.tjmAchat,
+        tjmVente: m.tjmVente,
+      }))
     );
   });
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/db";
-import { missions, freelances, clients, tarifs, affectations } from "@/db/schema";
+import { missions, freelances, clients, affectations } from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { tarifDuJour } from "@/lib/calculs/tarif-applicable";
 import { estJourFerie } from "@/lib/calculs/jours-feries";
 import { premierJourDuMois, dernierJourDuMois } from "@/lib/calculs/jours-ouvres";
 import { formatEuro, formatPourcent, formatJours, formatMois } from "@/lib/format";
@@ -90,6 +89,8 @@ export default async function PagePlanning({
       freelanceId: affectations.freelanceId,
       date: affectations.date,
       missionId: affectations.missionId,
+      tjmAchat: affectations.tjmAchat,
+      tjmVente: affectations.tjmVente,
       clientNom: clients.nom,
       prenom: freelances.prenom,
       nom: freelances.nom,
@@ -99,8 +100,6 @@ export default async function PagePlanning({
     .innerJoin(clients, eq(missions.clientId, clients.id))
     .innerJoin(freelances, eq(affectations.freelanceId, freelances.id))
     .where(and(gte(affectations.date, debutMois), lte(affectations.date, finMois)));
-
-  const tousTarifs = await db.select().from(tarifs);
 
   // Couleur stable par mission.
   const idsMissions = Array.from(
@@ -127,25 +126,19 @@ export default async function PagePlanning({
     };
   });
 
-  // Tarifs par mission (en nombres) pour le calcul jour par jour.
-  const tarifsParMission = new Map<
-    number,
-    { dateEffet: string; tjmAchat: number; tjmVente: number }[]
-  >();
-  for (const t of tousTarifs) {
-    const arr = tarifsParMission.get(t.missionId) ?? [];
-    arr.push({
-      dateEffet: t.dateEffet,
-      tjmAchat: Number(t.tjmAchat),
-      tjmVente: Number(t.tjmVente),
-    });
-    tarifsParMission.set(t.missionId, arr);
-  }
-
-  // Indicateurs : chaque jour affecté utilise le tarif en vigueur CE jour-là.
+  // Indicateurs : chaque jour affecté porte son propre TJM (figé à la pose).
   const parMission = new Map<
     number,
-    { missionId: number; clientNom: string; freelanceNom: string; jours: number; ca: number; cout: number }
+    {
+      missionId: number;
+      clientNom: string;
+      freelanceNom: string;
+      jours: number;
+      ca: number;
+      cout: number;
+      tjmAchat: number;
+      tjmVente: number;
+    }
   >();
   for (const a of affs) {
     const e =
@@ -156,29 +149,25 @@ export default async function PagePlanning({
         jours: 0,
         ca: 0,
         cout: 0,
+        tjmAchat: Number(a.tjmAchat),
+        tjmVente: Number(a.tjmVente),
       };
-    const tarif = tarifDuJour(tarifsParMission.get(a.missionId) ?? [], a.date);
     e.jours += 1;
-    if (tarif) {
-      e.ca += tarif.tjmVente;
-      e.cout += tarif.tjmAchat;
-    }
+    e.ca += Number(a.tjmVente);
+    e.cout += Number(a.tjmAchat);
+    // TJM affiché : celui du dernier jour rencontré dans le mois.
+    e.tjmAchat = Number(a.tjmAchat);
+    e.tjmVente = Number(a.tjmVente);
     parMission.set(a.missionId, e);
   }
 
   const arrondi = (n: number) => Math.round(n * 100) / 100;
-  const detail = Array.from(parMission.values()).map((e) => {
-    // TJM affiché : tarif en vigueur en fin de mois (indicatif si plusieurs tarifs dans le mois).
-    const tarifFin = tarifDuJour(tarifsParMission.get(e.missionId) ?? [], finMois);
-    return {
-      ...e,
-      ca: arrondi(e.ca),
-      cout: arrondi(e.cout),
-      marge: arrondi(e.ca - e.cout),
-      tjmAchat: tarifFin?.tjmAchat ?? null,
-      tjmVente: tarifFin?.tjmVente ?? null,
-    };
-  });
+  const detail = Array.from(parMission.values()).map((e) => ({
+    ...e,
+    ca: arrondi(e.ca),
+    cout: arrondi(e.cout),
+    marge: arrondi(e.ca - e.cout),
+  }));
 
   const totalCa = detail.reduce((s, l) => s + l.ca, 0);
   const totalCout = detail.reduce((s, l) => s + l.cout, 0);

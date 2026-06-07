@@ -19,7 +19,6 @@ type Freelance = {
   id: number;
   prenom: string;
   nom: string;
-  notes: string | null;
 };
 
 export function FreelanceFormDialog({
@@ -66,11 +65,6 @@ export function FreelanceFormDialog({
               <Label htmlFor="nom">Nom *</Label>
               <Input id="nom" name="nom" defaultValue={freelance?.nom ?? ""} required />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Input id="notes" name="notes" defaultValue={freelance?.notes ?? ""} />
           </div>
 
           <DialogFooter>

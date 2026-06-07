@@ -17,9 +17,7 @@ export const freelances = pgTable("freelances", {
   id: serial("id").primaryKey(), // identifiant unique, généré automatiquement
   prenom: text("prenom").notNull(),
   nom: text("nom").notNull(),
-  email: text("email"), // facultatif
   actif: boolean("actif").notNull().default(true), // true = actif, false = inactif
-  notes: text("notes"), // optionnel (peut être vide)
 });
 
 // --- CLIENTS ---
@@ -27,12 +25,11 @@ export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
   nom: text("nom").notNull(), // nom de la société
   actif: boolean("actif").notNull().default(true), // true = actif, false = archivé
-  contactNom: text("contact_nom"), // optionnel
-  contactEmail: text("contact_email"), // optionnel
-  notes: text("notes"), // optionnel
 });
 
 // --- MISSIONS ---
+// Une mission relie un freelance à un client et porte son tarif courant (TJM).
+// Le tarif n'est plus historisé : un seul couple achat/vente par mission.
 export const missions = pgTable("missions", {
   id: serial("id").primaryKey(),
   // Références : on relie la mission à un freelance et à un client existants.
@@ -42,14 +39,10 @@ export const missions = pgTable("missions", {
   clientId: integer("client_id")
     .notNull()
     .references(() => clients.id),
-  dateDebut: date("date_debut"), // facultatif (le planning fait foi)
-  dateFin: date("date_fin"), // facultatif
-  // Décimales autorisées (0,5 à 7). Conservé pour compatibilité, plus utilisé dans le calcul.
-  joursParSemaine: numeric("jours_par_semaine", { precision: 3, scale: 1 })
-    .notNull()
-    .default("5"),
-  // Interrupteur manuel : la mission est-elle proposée dans le pop-up du planning ?
-  disponiblePlanning: boolean("disponible_planning").notNull().default(true),
+  nom: text("nom").notNull(), // libellé de la mission
+  // Tarif courant de la mission, en € HT. Recopié sur chaque jour d'affectation.
+  tjmAchat: numeric("tjm_achat", { precision: 10, scale: 2 }).notNull(), // ce qu'on paie au freelance
+  tjmVente: numeric("tjm_vente", { precision: 10, scale: 2 }).notNull(), // ce qu'on facture au client
   // Statut manuel actif / inactif (bouton "Désactiver").
   actif: boolean("actif").notNull().default(true),
 });
@@ -57,6 +50,8 @@ export const missions = pgTable("missions", {
 // --- AFFECTATIONS (planning jour par jour) ---
 // Un jour donné, un freelance est rattaché à une mission. La contrainte d'unicité
 // garantit qu'un freelance ne peut être affecté qu'à une seule mission par jour.
+// Le TJM est figé : il est recopié de la mission au moment où le jour est posé,
+// pour qu'une modification ultérieure du tarif de la mission ne change pas le passé.
 export const affectations = pgTable(
   "affectations",
   {
@@ -68,31 +63,8 @@ export const affectations = pgTable(
       .notNull()
       .references(() => freelances.id, { onDelete: "cascade" }),
     date: date("date").notNull(),
+    tjmAchat: numeric("tjm_achat", { precision: 10, scale: 2 }).notNull(), // copie figée du TJM achat
+    tjmVente: numeric("tjm_vente", { precision: 10, scale: 2 }).notNull(), // copie figée du TJM vente
   },
   (t) => [unique("un_freelance_par_jour").on(t.freelanceId, t.date)]
 );
-
-// --- TARIFS (périodes de tarification d'une mission) ---
-// Une mission a au moins un tarif. Un nouveau tarif s'applique à partir d'un mois donné,
-// ce qui conserve l'historique (option B validée dans la spec).
-export const tarifs = pgTable("tarifs", {
-  id: serial("id").primaryKey(),
-  missionId: integer("mission_id")
-    .notNull()
-    .references(() => missions.id, { onDelete: "cascade" }), // si on supprime la mission, ses tarifs partent avec
-  dateEffet: date("mois_effet").notNull(), // jour à partir duquel ce tarif s'applique
-  tjmAchat: numeric("tjm_achat", { precision: 10, scale: 2 }).notNull(), // € HT
-  tjmVente: numeric("tjm_vente", { precision: 10, scale: 2 }).notNull(), // € HT
-});
-
-// --- ABSENCES ---
-// Rattachées à une mission précise (pas au freelance globalement), par mois.
-export const absences = pgTable("absences", {
-  id: serial("id").primaryKey(),
-  missionId: integer("mission_id")
-    .notNull()
-    .references(() => missions.id, { onDelete: "cascade" }),
-  mois: date("mois").notNull(), // toujours le 1er du mois
-  jours: numeric("jours", { precision: 4, scale: 1 }).notNull(), // demi-journées autorisées (0,5)
-  motif: text("motif"), // optionnel : congés, maladie, autre
-});

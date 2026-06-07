@@ -5,11 +5,6 @@ import { freelances } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-function ouNull(valeur: FormDataEntryValue | null): string | null {
-  const texte = String(valeur ?? "").trim();
-  return texte === "" ? null : texte;
-}
-
 export type Resultat = { ok: boolean; message?: string };
 
 export async function creerFreelance(formData: FormData): Promise<Resultat> {
@@ -20,8 +15,6 @@ export async function creerFreelance(formData: FormData): Promise<Resultat> {
   await db.insert(freelances).values({
     prenom,
     nom,
-    email: ouNull(formData.get("email")),
-    notes: ouNull(formData.get("notes")),
     // actif = true par défaut (voir le schéma).
   });
 
@@ -38,7 +31,7 @@ export async function modifierFreelance(formData: FormData): Promise<Resultat> {
 
   await db
     .update(freelances)
-    .set({ prenom, nom, email: ouNull(formData.get("email")), notes: ouNull(formData.get("notes")) })
+    .set({ prenom, nom })
     .where(eq(freelances.id, id));
 
   revalidatePath("/freelances");

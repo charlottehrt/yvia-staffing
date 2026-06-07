@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/db";
-import { missions, freelances, clients, tarifs } from "@/db/schema";
+import { missions, freelances, clients } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { tarifDuJour } from "@/lib/calculs/tarif-applicable";
 import { formatEuro } from "@/lib/format";
 import { MissionFormDialog } from "./mission-form-dialog";
-import { MissionTarifsDialog } from "./mission-tarifs-dialog";
 import { ToggleActifMissionButton } from "./toggle-actif-mission-button";
 import { creerMission, modifierMission } from "./actions";
 
@@ -31,14 +29,15 @@ export default async function PageMissions({
 }) {
   const { statut: filtreActif = "actives" } = await searchParams;
 
-  const aujourdhui = new Date().toISOString().slice(0, 10);
-
   // Missions + noms du freelance et du client.
   const missionsRows = await db
     .select({
       id: missions.id,
+      nom: missions.nom,
       freelanceId: missions.freelanceId,
       clientId: missions.clientId,
+      tjmAchat: missions.tjmAchat,
+      tjmVente: missions.tjmVente,
       actif: missions.actif,
       freelancePrenom: freelances.prenom,
       freelanceNom: freelances.nom,
@@ -48,19 +47,6 @@ export default async function PageMissions({
     .innerJoin(freelances, eq(missions.freelanceId, freelances.id))
     .innerJoin(clients, eq(missions.clientId, clients.id))
     .orderBy(missions.id);
-
-  const tousTarifs = await db.select().from(tarifs);
-
-  // Tarifs regroupés par mission (pour l'historique des tarifs).
-  const tarifsParMission = new Map<
-    number,
-    { dateEffet: string; tjmAchat: string; tjmVente: string }[]
-  >();
-  for (const t of tousTarifs) {
-    const arr = tarifsParMission.get(t.missionId) ?? [];
-    arr.push({ dateEffet: t.dateEffet, tjmAchat: t.tjmAchat, tjmVente: t.tjmVente });
-    tarifsParMission.set(t.missionId, arr);
-  }
 
   // Listes pour les menus déroulants du formulaire.
   const freelancesActifs = await db
@@ -74,22 +60,10 @@ export default async function PageMissions({
     .where(eq(clients.actif, true))
     .orderBy(clients.nom);
 
-  const lignes = missionsRows.map((m) => {
-    const tarifsMission = tousTarifs
-      .filter((t) => t.missionId === m.id)
-      .map((t) => ({
-        dateEffet: t.dateEffet,
-        tjmAchat: Number(t.tjmAchat),
-        tjmVente: Number(t.tjmVente),
-      }));
-    const tarifCourant = tarifDuJour(tarifsMission, aujourdhui);
-    return { ...m, tarifCourant };
-  });
-
   const lignesAffichees =
     filtreActif === "inactives"
-      ? lignes.filter((l) => !l.actif)
-      : lignes.filter((l) => l.actif);
+      ? missionsRows.filter((l) => !l.actif)
+      : missionsRows.filter((l) => l.actif);
 
   const peutCreer = freelancesActifs.length > 0 && clientsListe.length > 0;
 
@@ -101,7 +75,6 @@ export default async function PageMissions({
           <MissionFormDialog
             action={creerMission}
             titre="Nouvelle mission"
-            avecTarif
             freelancesActifs={freelancesActifs}
             clientsListe={clientsListe}
             trigger={<Button>Nouvelle mission</Button>}
@@ -143,6 +116,7 @@ export default async function PageMissions({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Mission</TableHead>
                   <TableHead>Freelance</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead className="text-right">TJM achat</TableHead>
@@ -155,44 +129,36 @@ export default async function PageMissions({
               <TableBody>
                 {lignesAffichees.map((l) => (
                   <TableRow key={l.id}>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium">{l.nom}</TableCell>
+                    <TableCell>
                       {l.freelancePrenom} {l.freelanceNom}
                     </TableCell>
                     <TableCell>{l.clientNom}</TableCell>
+                    <TableCell className="text-right">{formatEuro(Number(l.tjmAchat))}</TableCell>
+                    <TableCell className="text-right">{formatEuro(Number(l.tjmVente))}</TableCell>
                     <TableCell className="text-right">
-                      {l.tarifCourant ? formatEuro(l.tarifCourant.tjmAchat) : "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {l.tarifCourant ? formatEuro(l.tarifCourant.tjmVente) : "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {l.tarifCourant
-                        ? formatEuro(l.tarifCourant.tjmVente - l.tarifCourant.tjmAchat)
-                        : "-"}
+                      {formatEuro(Number(l.tjmVente) - Number(l.tjmAchat))}
                     </TableCell>
                     <TableCell>{l.actif ? "Actif" : "Inactif"}</TableCell>
                     <TableCell className="text-right">
                       <MissionFormDialog
                         action={modifierMission}
                         titre="Modifier la mission"
-                        avecTarif={false}
                         freelancesActifs={freelancesActifs}
                         clientsListe={clientsListe}
                         mission={{
                           id: l.id,
+                          nom: l.nom,
                           freelanceId: l.freelanceId,
                           clientId: l.clientId,
+                          tjmAchat: l.tjmAchat,
+                          tjmVente: l.tjmVente,
                         }}
                         trigger={
                           <Button variant="ghost" size="sm">
                             Modifier
                           </Button>
                         }
-                      />
-                      <MissionTarifsDialog
-                        missionId={l.id}
-                        libelle={`${l.freelancePrenom} ${l.freelanceNom} / ${l.clientNom}`}
-                        tarifs={tarifsParMission.get(l.id) ?? []}
                       />
                       <ToggleActifMissionButton id={l.id} actif={l.actif} />
                     </TableCell>

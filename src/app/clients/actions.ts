@@ -7,24 +7,13 @@ import { clients } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-// Petit utilitaire : transforme un champ vide en null (champ optionnel).
-function ouNull(valeur: FormDataEntryValue | null): string | null {
-  const texte = String(valeur ?? "").trim();
-  return texte === "" ? null : texte;
-}
-
 export type Resultat = { ok: boolean; message?: string };
 
 export async function creerClient(formData: FormData): Promise<Resultat> {
   const nom = String(formData.get("nom") ?? "").trim();
   if (!nom) return { ok: false, message: "Le nom de la société est obligatoire." };
 
-  await db.insert(clients).values({
-    nom,
-    contactNom: ouNull(formData.get("contactNom")),
-    contactEmail: ouNull(formData.get("contactEmail")),
-    notes: ouNull(formData.get("notes")),
-  });
+  await db.insert(clients).values({ nom });
 
   // On indique à Next que la page /clients a changé : elle sera rafraîchie.
   revalidatePath("/clients");
@@ -37,15 +26,7 @@ export async function modifierClient(formData: FormData): Promise<Resultat> {
   if (!id) return { ok: false, message: "Client introuvable." };
   if (!nom) return { ok: false, message: "Le nom de la société est obligatoire." };
 
-  await db
-    .update(clients)
-    .set({
-      nom,
-      contactNom: ouNull(formData.get("contactNom")),
-      contactEmail: ouNull(formData.get("contactEmail")),
-      notes: ouNull(formData.get("notes")),
-    })
-    .where(eq(clients.id, id));
+  await db.update(clients).set({ nom }).where(eq(clients.id, id));
 
   revalidatePath("/clients");
   return { ok: true };

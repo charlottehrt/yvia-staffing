@@ -20,9 +20,6 @@ import type { Resultat } from "./actions";
 type Client = {
   id: number;
   nom: string;
-  contactNom: string | null;
-  contactEmail: string | null;
-  notes: string | null;
 };
 
 export function ClientFormDialog({
@@ -63,11 +60,6 @@ export function ClientFormDialog({
           <div className="space-y-2">
             <Label htmlFor="nom">Société *</Label>
             <Input id="nom" name="nom" defaultValue={client?.nom ?? ""} required />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Input id="notes" name="notes" defaultValue={client?.notes ?? ""} />
           </div>
 
           <DialogFooter>

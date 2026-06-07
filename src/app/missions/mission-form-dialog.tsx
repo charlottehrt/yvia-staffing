@@ -22,6 +22,9 @@ type Mission = {
   id: number;
   freelanceId: number;
   clientId: number;
+  nom: string;
+  tjmAchat: string;
+  tjmVente: string;
 };
 
 // Style commun aux menus déroulants natifs (proche du champ Input de shadcn).
@@ -35,7 +38,6 @@ export function MissionFormDialog({
   freelancesActifs,
   clientsListe,
   mission,
-  avecTarif,
 }: {
   action: (formData: FormData) => Promise<Resultat>;
   titre: string;
@@ -43,7 +45,6 @@ export function MissionFormDialog({
   freelancesActifs: OptionFreelance[];
   clientsListe: OptionClient[];
   mission?: Mission;
-  avecTarif: boolean; // true à la création (saisie du 1er tarif)
 }) {
   const [open, setOpen] = useState(false);
 
@@ -68,6 +69,11 @@ export function MissionFormDialog({
           className="space-y-4"
         >
           {mission ? <input type="hidden" name="id" value={mission.id} /> : null}
+
+          <div className="space-y-2">
+            <Label htmlFor="nom">Nom de la mission *</Label>
+            <Input id="nom" name="nom" defaultValue={mission?.nom ?? ""} required />
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="freelanceId">Freelance *</Label>
@@ -109,25 +115,32 @@ export function MissionFormDialog({
             </select>
           </div>
 
-          {avecTarif ? (
-            <div className="space-y-4 rounded-md border p-4">
-              <p className="text-sm font-medium">Premier tarif</p>
-              <div className="space-y-2">
-                <Label htmlFor="dateEffet">À partir du *</Label>
-                <Input id="dateEffet" name="dateEffet" type="date" required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="tjmAchat">TJM achat (€ HT) *</Label>
-                  <Input id="tjmAchat" name="tjmAchat" type="number" min="0" step="1" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="tjmVente">TJM vente (€ HT) *</Label>
-                  <Input id="tjmVente" name="tjmVente" type="number" min="0" step="1" required />
-                </div>
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="tjmAchat">TJM achat (€ HT) *</Label>
+              <Input
+                id="tjmAchat"
+                name="tjmAchat"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={mission?.tjmAchat ?? ""}
+                required
+              />
             </div>
-          ) : null}
+            <div className="space-y-2">
+              <Label htmlFor="tjmVente">TJM vente (€ HT) *</Label>
+              <Input
+                id="tjmVente"
+                name="tjmVente"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={mission?.tjmVente ?? ""}
+                required
+              />
+            </div>
+          </div>
 
           <DialogFooter>
             <Button type="submit">Enregistrer</Button>
