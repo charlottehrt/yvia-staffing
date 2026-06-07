@@ -177,6 +177,7 @@ export default async function PagePlanning({
           <Button
             variant="outline"
             size="sm"
+            nativeButton={false}
             render={<Link href={`/?annee=${precedent.annee}&mois=${precedent.mois}`}>Mois précédent</Link>}
           />
           <span className="min-w-40 text-center text-sm font-medium capitalize">
@@ -185,6 +186,7 @@ export default async function PagePlanning({
           <Button
             variant="outline"
             size="sm"
+            nativeButton={false}
             render={<Link href={`/?annee=${suivant.annee}&mois=${suivant.mois}`}>Mois suivant</Link>}
           />
         </div>
