@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/db";
-import { missions, freelances, clients, affectations } from "@/db/schema";
+import {
+  missions,
+  freelances,
+  clients,
+  affectations,
+  projets,
+  encaissements,
+  decaissements,
+} from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -107,6 +115,81 @@ export default async function PagePlanning({
     .innerJoin(freelances, eq(affectations.freelanceId, freelances.id))
     .where(and(gte(affectations.date, debutMois), lte(affectations.date, finMois)));
 
+  // --- Projets (forfait) : lignes du calendrier + flux du mois ---
+  const projetsActifs = await db
+    .select({ id: projets.id, nom: projets.nom, clientNom: clients.nom })
+    .from(projets)
+    .innerJoin(clients, eq(projets.clientId, clients.id))
+    .where(eq(projets.actif, true))
+    .orderBy(projets.nom);
+
+  const encMois = await db
+    .select({
+      id: encaissements.id,
+      projetId: encaissements.projetId,
+      date: encaissements.date,
+      montant: encaissements.montant,
+      libelle: encaissements.libelle,
+    })
+    .from(encaissements)
+    .where(and(gte(encaissements.date, debutMois), lte(encaissements.date, finMois)));
+
+  const decMois = await db
+    .select({
+      id: decaissements.id,
+      projetId: decaissements.projetId,
+      date: decaissements.date,
+      montant: decaissements.montant,
+      libelle: decaissements.libelle,
+      prenom: freelances.prenom,
+      nom: freelances.nom,
+    })
+    .from(decaissements)
+    .innerJoin(freelances, eq(decaissements.freelanceId, freelances.id))
+    .where(and(gte(decaissements.date, debutMois), lte(decaissements.date, finMois)));
+
+  // Événements regroupés par projet puis par date.
+  const evenementsParProjet = new Map<
+    number,
+    Record<string, { id: number; type: "encaissement" | "decaissement"; montant: string; libelle: string | null; freelanceNom: string | null }[]>
+  >();
+  const ajouterEvenement = (
+    projetId: number,
+    date: string,
+    ev: { id: number; type: "encaissement" | "decaissement"; montant: string; libelle: string | null; freelanceNom: string | null }
+  ) => {
+    const parDate = evenementsParProjet.get(projetId) ?? {};
+    parDate[date] = [...(parDate[date] ?? []), ev];
+    evenementsParProjet.set(projetId, parDate);
+  };
+  for (const e of encMois)
+    ajouterEvenement(e.projetId, e.date, {
+      id: e.id,
+      type: "encaissement",
+      montant: e.montant,
+      libelle: e.libelle,
+      freelanceNom: null,
+    });
+  for (const d of decMois)
+    ajouterEvenement(d.projetId, d.date, {
+      id: d.id,
+      type: "decaissement",
+      montant: d.montant,
+      libelle: d.libelle,
+      freelanceNom: `${d.prenom} ${d.nom}`,
+    });
+
+  const projetsLignes = projetsActifs.map((p) => ({
+    id: p.id,
+    nom: p.nom,
+    clientNom: p.clientNom,
+    evenements: evenementsParProjet.get(p.id) ?? {},
+  }));
+
+  // CA / coût du mois apportés par les forfaits (événements datés ce mois).
+  const caForfait = encMois.reduce((s, e) => s + Number(e.montant), 0);
+  const coutForfait = decMois.reduce((s, d) => s + Number(d.montant), 0);
+
   // Couleur stable par mission.
   const idsMissions = Array.from(
     new Set([...missionsDispo.map((m) => m.id), ...affs.map((a) => a.missionId)])
@@ -201,9 +284,10 @@ export default async function PagePlanning({
     marge: arrondi(e.ca - e.cout),
   }));
 
-  const totalCa = detail.reduce((s, l) => s + l.ca, 0);
-  const totalCout = detail.reduce((s, l) => s + l.cout, 0);
-  const totalMarge = detail.reduce((s, l) => s + l.marge, 0);
+  // Totaux du mois = régie (jours posés) + forfait (encaissements / décaissements).
+  const totalCa = arrondi(detail.reduce((s, l) => s + l.ca, 0) + caForfait);
+  const totalCout = arrondi(detail.reduce((s, l) => s + l.cout, 0) + coutForfait);
+  const totalMarge = arrondi(totalCa - totalCout);
   const tauxMarge = totalCa > 0 ? totalMarge / totalCa : 0;
 
   return (
@@ -284,7 +368,12 @@ export default async function PagePlanning({
             />
           </div>
 
-          <PlanningCalendar jours={jours} lignes={lignes} />
+          <PlanningCalendar
+            jours={jours}
+            lignes={lignes}
+            projets={projetsLignes}
+            freelancesActifs={freelancesActifs}
+          />
         </>
       )}
 

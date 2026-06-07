@@ -11,8 +11,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { formatEuro, formatDate } from "@/lib/format";
 import { affecterJours, libererJours, modifierTjmAffectation } from "./planning-actions";
+import {
+  ajouterEncaissement,
+  supprimerEncaissement,
+  ajouterDecaissement,
+  supprimerDecaissement,
+} from "./projets/actions";
 
 export type Jour = {
   date: string; // AAAA-MM-JJ
@@ -48,13 +56,34 @@ export type LigneFreelance = {
   >;
 };
 
+export type EvenementProjet = {
+  id: number;
+  type: "encaissement" | "decaissement";
+  montant: string;
+  libelle: string | null;
+  freelanceNom: string | null; // renseigné pour un décaissement
+};
+
+export type LigneProjet = {
+  id: number;
+  nom: string;
+  clientNom: string;
+  evenements: Record<string, EvenementProjet[]>; // date -> événements
+};
+
 export function PlanningCalendar({
   jours,
   lignes,
+  projets,
+  freelancesActifs,
 }: {
   jours: Jour[];
   lignes: LigneFreelance[];
+  projets: LigneProjet[];
+  freelancesActifs: { id: number; prenom: string; nom: string }[];
 }) {
+  // Pop-up d'événements d'un projet, pour une date donnée.
+  const [popupProjet, setPopupProjet] = useState<{ projetId: number; date: string } | null>(null);
   // Sélection en cours : un freelance + une plage d'indices de jours.
   const [selection, setSelection] = useState<{
     freelanceId: number;
@@ -132,6 +161,32 @@ export function PlanningCalendar({
       ? ligneActive.cellules[popup.dates[0]] ?? null
       : null;
 
+  // Pop-up projet : on lit les données fraîches depuis les props (mises à jour après action).
+  const projetActif = popupProjet ? projets.find((p) => p.id === popupProjet.projetId) ?? null : null;
+  const evenementsJour =
+    projetActif && popupProjet ? projetActif.evenements[popupProjet.date] ?? [] : [];
+
+  async function ajouterEnc(fd: FormData) {
+    const res = await ajouterEncaissement(fd);
+    if (res.ok) toast.success("Encaissement ajouté.");
+    else toast.error(res.message ?? "Erreur.");
+  }
+  async function ajouterDec(fd: FormData) {
+    const res = await ajouterDecaissement(fd);
+    if (res.ok) toast.success("Décaissement ajouté.");
+    else toast.error(res.message ?? "Erreur.");
+  }
+  async function supprimerEv(ev: EvenementProjet) {
+    const fd = new FormData();
+    fd.set("id", String(ev.id));
+    const res =
+      ev.type === "encaissement"
+        ? await supprimerEncaissement(fd)
+        : await supprimerDecaissement(fd);
+    if (res.ok) toast.success("Événement supprimé.");
+    else toast.error(res.message ?? "Erreur.");
+  }
+
   return (
     <div className="overflow-x-auto rounded-xl border border-border bg-card">
       <table className="border-collapse select-none text-sm">
@@ -165,6 +220,47 @@ export function PlanningCalendar({
           </tr>
         </thead>
         <tbody>
+          {/* Lignes de projets (forfait) : on y pose les encaissements / décaissements */}
+          {projets.map((p) => (
+            <tr key={`projet-${p.id}`} className="bg-muted/30">
+              <td className="sticky left-0 z-10 border-b border-border bg-muted/30 px-3 py-1 whitespace-nowrap">
+                <span className="font-medium">{p.nom}</span>
+                <span className="ml-1 text-xs text-muted-foreground">forfait</span>
+              </td>
+              {jours.map((j) => {
+                const ev = p.evenements[j.date] ?? [];
+                const nbEnc = ev.filter((e) => e.type === "encaissement").length;
+                const nbDec = ev.filter((e) => e.type === "decaissement").length;
+                return (
+                  <td
+                    key={j.date}
+                    onClick={() => setPopupProjet({ projetId: p.id, date: j.date })}
+                    title={`${p.nom} · ${formatDate(j.date)}`}
+                    className={`h-9 w-9 cursor-pointer border-b border-b-border border-l p-0.5 text-center align-middle ${
+                      j.estAujourdhui
+                        ? "border-l-primary bg-primary/10"
+                        : `border-l-border ${j.weekend || j.ferie ? "bg-secondary/60" : ""}`
+                    }`}
+                  >
+                    {ev.length > 0 ? (
+                      <div className="flex h-full w-full flex-wrap items-center justify-center gap-0.5 leading-none">
+                        {nbEnc > 0 ? (
+                          <span className="rounded-sm bg-emerald-500 px-1 text-[9px] font-medium text-white">
+                            {nbEnc}
+                          </span>
+                        ) : null}
+                        {nbDec > 0 ? (
+                          <span className="rounded-sm bg-rose-500 px-1 text-[9px] font-medium text-white">
+                            {nbDec}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
           {lignes.map((ligne) => (
             <tr key={ligne.id}>
               <td className="sticky left-0 z-10 border-b border-border bg-card px-3 py-1 font-medium whitespace-nowrap">
@@ -269,6 +365,98 @@ export function PlanningCalendar({
               onConfirm={liberer}
             />
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pop-up des événements d'un projet pour un jour */}
+      <Dialog
+        open={popupProjet !== null}
+        onOpenChange={(o) => (!o ? setPopupProjet(null) : null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {projetActif?.nom}
+              {projetActif ? (
+                <span className="text-muted-foreground"> · {projetActif.clientNom}</span>
+              ) : null}
+              {popupProjet ? ` · ${formatDate(popupProjet.date)}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Événements du jour */}
+          <div className="space-y-1">
+            {evenementsJour.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aucun événement ce jour.</p>
+            ) : (
+              evenementsJour.map((ev) => (
+                <div
+                  key={`${ev.type}-${ev.id}`}
+                  className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5 text-sm"
+                >
+                  <span
+                    className={`size-2 shrink-0 rounded-full ${
+                      ev.type === "encaissement" ? "bg-emerald-500" : "bg-rose-500"
+                    }`}
+                  />
+                  <span className="shrink-0 font-medium">
+                    {ev.type === "encaissement" ? "Encaissement" : "Décaissement"}
+                  </span>
+                  {ev.freelanceNom ? (
+                    <span className="shrink-0 text-muted-foreground">{ev.freelanceNom}</span>
+                  ) : null}
+                  <span className="flex-1 truncate text-muted-foreground">{ev.libelle ?? ""}</span>
+                  <span className="shrink-0 tabular-nums">{formatEuro(Number(ev.montant))}</span>
+                  <button
+                    onClick={() => supprimerEv(ev)}
+                    className="shrink-0 text-muted-foreground hover:text-rose-600"
+                    title="Supprimer"
+                    aria-label="Supprimer"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Ajout d'un encaissement */}
+          <form action={ajouterEnc} className="space-y-2 border-t border-border pt-3">
+            <p className="text-sm font-medium text-emerald-600">Ajouter un encaissement</p>
+            <input type="hidden" name="projetId" value={String(popupProjet?.projetId ?? "")} />
+            <input type="hidden" name="date" value={popupProjet?.date ?? ""} />
+            <div className="flex gap-2">
+              <Input name="montant" type="number" min="0" step="1" placeholder="Montant €" required />
+              <Input name="libelle" placeholder="Libellé (optionnel)" />
+              <Button type="submit" size="sm" variant="outline">
+                Ajouter
+              </Button>
+            </div>
+          </form>
+
+          {/* Ajout d'un décaissement */}
+          <form action={ajouterDec} className="space-y-2 border-t border-border pt-3">
+            <p className="text-sm font-medium text-rose-600">Ajouter un décaissement</p>
+            <input type="hidden" name="projetId" value={String(popupProjet?.projetId ?? "")} />
+            <input type="hidden" name="date" value={popupProjet?.date ?? ""} />
+            <Select
+              name="freelanceId"
+              required
+              defaultValue=""
+              placeholder="Choisir un freelance"
+              options={freelancesActifs.map((f) => ({
+                value: f.id,
+                label: `${f.prenom} ${f.nom}`,
+              }))}
+            />
+            <div className="flex gap-2">
+              <Input name="montant" type="number" min="0" step="1" placeholder="Montant €" required />
+              <Input name="libelle" placeholder="Libellé (optionnel)" />
+              <Button type="submit" size="sm" variant="outline">
+                Ajouter
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
