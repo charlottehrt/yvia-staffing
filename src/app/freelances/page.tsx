@@ -23,25 +23,19 @@ export default async function PageFreelances() {
     .from(freelances)
     .orderBy(desc(freelances.actif), freelances.nom);
 
-  // Missions par freelance (client + dates) pour la fiche détaillée.
+  // Missions par freelance (clients) pour la fiche détaillée.
   const missionsRows = await db
     .select({
       freelanceId: missions.freelanceId,
       clientNom: clients.nom,
-      dateDebut: missions.dateDebut,
-      dateFin: missions.dateFin,
     })
     .from(missions)
-    .innerJoin(clients, eq(missions.clientId, clients.id))
-    .orderBy(missions.dateDebut);
+    .innerJoin(clients, eq(missions.clientId, clients.id));
 
-  const missionsParFreelance = new Map<
-    number,
-    { clientNom: string; dateDebut: string; dateFin: string | null }[]
-  >();
+  const missionsParFreelance = new Map<number, { clientNom: string }[]>();
   for (const m of missionsRows) {
     const arr = missionsParFreelance.get(m.freelanceId) ?? [];
-    arr.push({ clientNom: m.clientNom, dateDebut: m.dateDebut, dateFin: m.dateFin });
+    arr.push({ clientNom: m.clientNom });
     missionsParFreelance.set(m.freelanceId, arr);
   }
 
@@ -85,7 +79,7 @@ export default async function PageFreelances() {
                         missions={missionsParFreelance.get(freelance.id) ?? []}
                       />
                     </TableCell>
-                    <TableCell>{freelance.actif ? "Actif" : "Inactif"}</TableCell>
+                    <TableCell>{freelance.actif ? "Actif" : "Archivé"}</TableCell>
                     <TableCell className="text-right">
                       <FreelanceFormDialog
                         action={modifierFreelance}

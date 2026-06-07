@@ -10,8 +10,6 @@ export type Resultat = { ok: boolean; message?: string };
 type ValeursMission = {
   freelanceId: number;
   clientId: number;
-  dateDebut: string;
-  dateFin: string | null;
 };
 
 // Résultat de la lecture : soit une erreur, soit des valeurs valides.
@@ -21,18 +19,11 @@ type Lecture = { ok: false; erreur: string } | { ok: true; valeurs: ValeursMissi
 function lireChampsMission(formData: FormData): Lecture {
   const freelanceId = Number(formData.get("freelanceId"));
   const clientId = Number(formData.get("clientId"));
-  const dateDebut = String(formData.get("dateDebut") ?? "").trim();
-  const dateFinBrut = String(formData.get("dateFin") ?? "").trim();
-  const dateFin = dateFinBrut === "" ? null : dateFinBrut;
 
   if (!freelanceId || !clientId) {
     return { ok: false, erreur: "Le freelance et le client sont obligatoires." };
   }
-  if (!dateDebut) return { ok: false, erreur: "La date de début est obligatoire." };
-  if (dateFin && dateFin < dateDebut) {
-    return { ok: false, erreur: "La date de fin doit être après la date de début." };
-  }
-  return { ok: true, valeurs: { freelanceId, clientId, dateDebut, dateFin } };
+  return { ok: true, valeurs: { freelanceId, clientId } };
 }
 
 export async function creerMission(formData: FormData): Promise<Resultat> {

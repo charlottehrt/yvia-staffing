@@ -7,12 +7,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { formatDate } from "@/lib/format";
 
 type MissionResume = {
   freelanceNom: string;
-  dateDebut: string;
-  dateFin: string | null;
 };
 
 export function ClientDetailDialog({
@@ -44,11 +41,8 @@ export function ClientDetailDialog({
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">Freelances placés :</p>
             {missions.map((m, i) => (
-              <div key={i} className="rounded-lg border border-border px-3 py-2">
-                <p className="font-medium">{m.freelanceNom}</p>
-                <p className="text-sm text-muted-foreground">
-                  Du {formatDate(m.dateDebut)} au {formatDate(m.dateFin)}
-                </p>
+              <div key={i} className="rounded-lg border border-border px-3 py-2 font-medium">
+                {m.freelanceNom}
               </div>
             ))}
           </div>

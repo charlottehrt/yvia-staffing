@@ -14,11 +14,11 @@ export function ToggleActifButton({ id, actif }: { id: number; actif: boolean })
         formData.set("id", String(id));
         formData.set("actif", String(actif));
         const res = await basculerActif(formData);
-        if (res.ok) toast.success(actif ? "Freelance désactivé." : "Freelance réactivé.");
+        if (res.ok) toast.success(actif ? "Freelance archivé." : "Freelance réactivé.");
         else toast.error(res.message ?? "Action impossible.");
       }}
     >
-      {actif ? "Désactiver" : "Réactiver"}
+      {actif ? "Archiver" : "Réactiver"}
     </Button>
   );
 }

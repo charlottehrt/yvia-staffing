@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { clients, missions, freelances } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,37 +20,30 @@ import {
 } from "@/components/ui/table";
 import { ClientFormDialog } from "./client-form-dialog";
 import { ClientDetailDialog } from "./client-detail-dialog";
-import { DeleteClientButton } from "./delete-client-button";
+import { ArchiveClientButton } from "./archive-client-button";
 import { creerClient, modifierClient } from "./actions";
 
 export default async function PageClients() {
-  // Lecture de tous les clients, triés par nom.
-  const liste = await db.select().from(clients).orderBy(clients.nom);
+  // Clients actifs d'abord, puis par nom.
+  const liste = await db
+    .select()
+    .from(clients)
+    .orderBy(desc(clients.actif), clients.nom);
 
-  // Missions par client (freelance + dates) pour la fiche détaillée.
+  // Freelances placés par client, pour la fiche détaillée.
   const missionsRows = await db
     .select({
       clientId: missions.clientId,
       freelanceNom: freelances.nom,
       freelancePrenom: freelances.prenom,
-      dateDebut: missions.dateDebut,
-      dateFin: missions.dateFin,
     })
     .from(missions)
-    .innerJoin(freelances, eq(missions.freelanceId, freelances.id))
-    .orderBy(missions.dateDebut);
+    .innerJoin(freelances, eq(missions.freelanceId, freelances.id));
 
-  const missionsParClient = new Map<
-    number,
-    { freelanceNom: string; dateDebut: string; dateFin: string | null }[]
-  >();
+  const missionsParClient = new Map<number, { freelanceNom: string }[]>();
   for (const m of missionsRows) {
     const arr = missionsParClient.get(m.clientId) ?? [];
-    arr.push({
-      freelanceNom: `${m.freelancePrenom} ${m.freelanceNom}`,
-      dateDebut: m.dateDebut,
-      dateFin: m.dateFin,
-    });
+    arr.push({ freelanceNom: `${m.freelancePrenom} ${m.freelanceNom}` });
     missionsParClient.set(m.clientId, arr);
   }
 
@@ -81,18 +74,20 @@ export default async function PageClients() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Société</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {liste.map((client) => (
-                  <TableRow key={client.id}>
+                  <TableRow key={client.id} className={client.actif ? "" : "opacity-50"}>
                     <TableCell>
                       <ClientDetailDialog
                         nom={client.nom}
                         missions={missionsParClient.get(client.id) ?? []}
                       />
                     </TableCell>
+                    <TableCell>{client.actif ? "Actif" : "Archivé"}</TableCell>
                     <TableCell className="text-right">
                       <ClientFormDialog
                         action={modifierClient}
@@ -104,7 +99,7 @@ export default async function PageClients() {
                           </Button>
                         }
                       />
-                      <DeleteClientButton id={client.id} nom={client.nom} />
+                      <ArchiveClientButton id={client.id} actif={client.actif} />
                     </TableCell>
                   </TableRow>
                 ))}

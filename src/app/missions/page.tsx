@@ -42,8 +42,6 @@ export default async function PageMissions({
       id: missions.id,
       freelanceId: missions.freelanceId,
       clientId: missions.clientId,
-      dateDebut: missions.dateDebut,
-      dateFin: missions.dateFin,
       freelancePrenom: freelances.prenom,
       freelanceNom: freelances.nom,
       clientNom: clients.nom,
@@ -71,6 +69,7 @@ export default async function PageMissions({
   const clientsListe = await db
     .select({ id: clients.id, nom: clients.nom })
     .from(clients)
+    .where(eq(clients.actif, true))
     .orderBy(clients.nom);
 
   const lignes = missionsRows.map((m) => {
@@ -184,8 +183,6 @@ export default async function PageMissions({
                           id: l.id,
                           freelanceId: l.freelanceId,
                           clientId: l.clientId,
-                          dateDebut: l.dateDebut,
-                          dateFin: l.dateFin,
                         }}
                         trigger={
                           <Button variant="ghost" size="sm">

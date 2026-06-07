@@ -51,11 +51,14 @@ export async function modifierClient(formData: FormData): Promise<Resultat> {
   return { ok: true };
 }
 
-export async function supprimerClient(formData: FormData): Promise<Resultat> {
+// Archive / désarchive un client (on ne supprime pas, pour garder l'historique).
+export async function basculerActifClient(formData: FormData): Promise<Resultat> {
   const id = Number(formData.get("id"));
+  const actif = String(formData.get("actif")) === "true";
   if (!id) return { ok: false, message: "Client introuvable." };
 
-  await db.delete(clients).where(eq(clients.id, id));
+  await db.update(clients).set({ actif: !actif }).where(eq(clients.id, id));
   revalidatePath("/clients");
+  revalidatePath("/");
   return { ok: true };
 }

@@ -26,6 +26,7 @@ export const freelances = pgTable("freelances", {
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
   nom: text("nom").notNull(), // nom de la société
+  actif: boolean("actif").notNull().default(true), // true = actif, false = archivé
   contactNom: text("contact_nom"), // optionnel
   contactEmail: text("contact_email"), // optionnel
   notes: text("notes"), // optionnel
@@ -41,8 +42,8 @@ export const missions = pgTable("missions", {
   clientId: integer("client_id")
     .notNull()
     .references(() => clients.id),
-  dateDebut: date("date_debut").notNull(),
-  dateFin: date("date_fin"), // optionnel : vide = mission en cours sans terme défini
+  dateDebut: date("date_debut"), // facultatif (le planning fait foi)
+  dateFin: date("date_fin"), // facultatif
   // Décimales autorisées (0,5 à 7). Conservé pour compatibilité, plus utilisé dans le calcul.
   joursParSemaine: numeric("jours_par_semaine", { precision: 3, scale: 1 })
     .notNull()

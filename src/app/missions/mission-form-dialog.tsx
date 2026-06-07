@@ -22,8 +22,6 @@ type Mission = {
   id: number;
   freelanceId: number;
   clientId: number;
-  dateDebut: string;
-  dateFin: string | null;
 };
 
 // Style commun aux menus déroulants natifs (proche du champ Input de shadcn).
@@ -109,28 +107,6 @@ export function MissionFormDialog({
                 </option>
               ))}
             </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="dateDebut">Date de début *</Label>
-              <Input
-                id="dateDebut"
-                name="dateDebut"
-                type="date"
-                defaultValue={mission?.dateDebut ?? ""}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="dateFin">Date de fin</Label>
-              <Input
-                id="dateFin"
-                name="dateFin"
-                type="date"
-                defaultValue={mission?.dateFin ?? ""}
-              />
-            </div>
           </div>
 
           {avecTarif ? (
