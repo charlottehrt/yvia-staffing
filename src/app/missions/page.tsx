@@ -19,7 +19,6 @@ import { ToggleActifMissionButton } from "./toggle-actif-mission-button";
 import { creerMission, modifierMission } from "./actions";
 
 const filtres = [
-  { slug: "toutes", label: "Toutes" },
   { slug: "actives", label: "Actives" },
   { slug: "inactives", label: "Inactives" },
 ] as const;
@@ -29,7 +28,7 @@ export default async function PageMissions({
 }: {
   searchParams: Promise<{ statut?: string }>;
 }) {
-  const { statut: filtreActif = "toutes" } = await searchParams;
+  const { statut: filtreActif = "actives" } = await searchParams;
 
   const maintenant = new Date();
   const annee = maintenant.getUTCFullYear();
@@ -78,11 +77,9 @@ export default async function PageMissions({
   });
 
   const lignesAffichees =
-    filtreActif === "actives"
-      ? lignes.filter((l) => l.actif)
-      : filtreActif === "inactives"
-        ? lignes.filter((l) => !l.actif)
-        : lignes;
+    filtreActif === "inactives"
+      ? lignes.filter((l) => !l.actif)
+      : lignes.filter((l) => l.actif);
 
   const peutCreer = freelancesActifs.length > 0 && clientsListe.length > 0;
 
