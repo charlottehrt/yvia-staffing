@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/db";
 import { missions, freelances, clients, affectations } from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
@@ -205,6 +206,17 @@ export default async function PagePlanning({
   const totalMarge = detail.reduce((s, l) => s + l.marge, 0);
   const tauxMarge = totalCa > 0 ? totalMarge / totalCa : 0;
 
+  // Marge cumulée depuis le 1er juin 2026 (tous les jours posés, passés et à venir).
+  const PREMIER_JOUR = "2026-06-01";
+  const affsDepuis = await db
+    .select({ tjmAchat: affectations.tjmAchat, tjmVente: affectations.tjmVente })
+    .from(affectations)
+    .where(gte(affectations.date, PREMIER_JOUR));
+  const margeCumulee = affsDepuis.reduce(
+    (s, a) => s + (Number(a.tjmVente) - Number(a.tjmAchat)),
+    0
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -212,28 +224,43 @@ export default async function PagePlanning({
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            size="sm"
+            size="icon-sm"
             nativeButton={false}
-            render={<Link href={`/?annee=${precedent.annee}&mois=${precedent.mois}`}>Mois précédent</Link>}
+            render={
+              <Link
+                href={`/?annee=${precedent.annee}&mois=${precedent.mois}`}
+                aria-label="Mois précédent"
+              >
+                <ChevronLeft />
+              </Link>
+            }
           />
           <span className="min-w-40 text-center text-sm font-medium capitalize">
             {formatMois(annee, mois)}
           </span>
           <Button
             variant="outline"
-            size="sm"
+            size="icon-sm"
             nativeButton={false}
-            render={<Link href={`/?annee=${suivant.annee}&mois=${suivant.mois}`}>Mois suivant</Link>}
-          />
-          <EtendreMoisButton
-            annee={annee}
-            mois={mois}
-            libelleMoisSuivant={formatMois(suivant.annee, suivant.mois)}
+            render={
+              <Link
+                href={`/?annee=${suivant.annee}&mois=${suivant.mois}`}
+                aria-label="Mois suivant"
+              >
+                <ChevronRight />
+              </Link>
+            }
           />
         </div>
       </div>
 
-      {/* Indicateurs (au-dessus du planning) */}
+      {/* Marge cumulée depuis le 1er juin 2026 */}
+      <Indicateur
+        titre="Marge cumulée depuis le 1er juin 2026"
+        valeur={formatEuro(margeCumulee)}
+      />
+
+      {/* Indicateurs du mois affiché */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Indicateur titre="CA prévisionnel" valeur={formatEuro(totalCa)} />
         <Indicateur titre="Coût total" valeur={formatEuro(totalCout)} />
@@ -249,10 +276,17 @@ export default async function PagePlanning({
         </Card>
       ) : (
         <>
-          <p className="text-sm text-muted-foreground">
-            Cliquez-glissez sur une ligne pour sélectionner des jours, puis choisissez la
-            mission. Cliquez sur un jour déjà posé pour modifier son tarif.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              Cliquez-glissez sur une ligne pour sélectionner des jours, puis choisissez la
+              mission. Cliquez sur un jour déjà posé pour modifier son tarif.
+            </p>
+            <EtendreMoisButton
+              annee={annee}
+              mois={mois}
+              libelleMoisSuivant={formatMois(suivant.annee, suivant.mois)}
+            />
+          </div>
 
           {/* Légende des couleurs de missions */}
           {legende.length > 0 ? (
