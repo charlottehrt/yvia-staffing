@@ -206,17 +206,6 @@ export default async function PagePlanning({
   const totalMarge = detail.reduce((s, l) => s + l.marge, 0);
   const tauxMarge = totalCa > 0 ? totalMarge / totalCa : 0;
 
-  // Marge cumulée depuis le 1er juin 2026 (tous les jours posés, passés et à venir).
-  const PREMIER_JOUR = "2026-06-01";
-  const affsDepuis = await db
-    .select({ tjmAchat: affectations.tjmAchat, tjmVente: affectations.tjmVente })
-    .from(affectations)
-    .where(gte(affectations.date, PREMIER_JOUR));
-  const margeCumulee = affsDepuis.reduce(
-    (s, a) => s + (Number(a.tjmVente) - Number(a.tjmAchat)),
-    0
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -253,12 +242,6 @@ export default async function PagePlanning({
           />
         </div>
       </div>
-
-      {/* Marge cumulée depuis le 1er juin 2026 */}
-      <Indicateur
-        titre="Marge cumulée depuis le 1er juin 2026"
-        valeur={formatEuro(margeCumulee)}
-      />
 
       {/* Indicateurs du mois affiché */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

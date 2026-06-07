@@ -94,20 +94,6 @@ export default async function PageClients({
     statsParClient.set(a.clientId, s);
   }
 
-  // CA cumulé depuis le 1er juin 2026, par client.
-  const affsDepuis = await db
-    .select({ clientId: missions.clientId, tjmVente: affectations.tjmVente })
-    .from(affectations)
-    .innerJoin(missions, eq(affectations.missionId, missions.id))
-    .where(gte(affectations.date, "2026-06-01"));
-  const caDepuisParClient = new Map<number, number>();
-  for (const a of affsDepuis) {
-    caDepuisParClient.set(
-      a.clientId,
-      (caDepuisParClient.get(a.clientId) ?? 0) + Number(a.tjmVente)
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -168,10 +154,7 @@ export default async function PageClients({
                       <ClientDetailDialog
                         nom={client.nom}
                         missions={missionsParClient.get(client.id) ?? []}
-                        stats={{
-                          ...(statsParClient.get(client.id) ?? { jours: 0, ca: 0 }),
-                          caDepuis: caDepuisParClient.get(client.id) ?? 0,
-                        }}
+                        stats={statsParClient.get(client.id) ?? { jours: 0, ca: 0 }}
                       />
                     </TableCell>
                     <TableCell className="text-right">

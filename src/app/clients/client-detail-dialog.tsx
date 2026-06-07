@@ -31,7 +31,7 @@ export function ClientDetailDialog({
 }: {
   nom: string;
   missions: MissionResume[];
-  stats: { jours: number; ca: number; caDepuis: number };
+  stats: { jours: number; ca: number };
 }) {
   return (
     <Dialog>
@@ -47,8 +47,8 @@ export function ClientDetailDialog({
           <DialogTitle>{nom}</DialogTitle>
         </DialogHeader>
 
-        {/* Indicateurs */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* Indicateurs du mois en cours */}
+        <div className="grid grid-cols-2 gap-3">
           <div className="rounded-lg border border-border p-3">
             <p className="text-xs text-muted-foreground">Jours facturés ce mois</p>
             <p className="font-display text-2xl">{formatJours(stats.jours)}</p>
@@ -56,10 +56,6 @@ export function ClientDetailDialog({
           <div className="rounded-lg border border-border p-3">
             <p className="text-xs text-muted-foreground">CA ce mois</p>
             <p className="font-display text-2xl">{formatEuro(stats.ca)}</p>
-          </div>
-          <div className="rounded-lg border border-border p-3">
-            <p className="text-xs text-muted-foreground">CA depuis le 1er juin 2026</p>
-            <p className="font-display text-2xl">{formatEuro(stats.caDepuis)}</p>
           </div>
         </div>
 

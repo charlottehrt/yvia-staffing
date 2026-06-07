@@ -32,7 +32,7 @@ export function FreelanceDetailDialog({
 }: {
   nom: string;
   missions: MissionResume[];
-  stats: { jours: number; marge: number; margeDepuis: number };
+  stats: { jours: number; marge: number };
 }) {
   return (
     <Dialog>
@@ -48,8 +48,8 @@ export function FreelanceDetailDialog({
           <DialogTitle>{nom}</DialogTitle>
         </DialogHeader>
 
-        {/* Indicateurs */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* Indicateurs du mois en cours */}
+        <div className="grid grid-cols-2 gap-3">
           <div className="rounded-lg border border-border p-3">
             <p className="text-xs text-muted-foreground">Jours posés ce mois</p>
             <p className="font-display text-2xl">{formatJours(stats.jours)}</p>
@@ -57,10 +57,6 @@ export function FreelanceDetailDialog({
           <div className="rounded-lg border border-border p-3">
             <p className="text-xs text-muted-foreground">Marge ce mois</p>
             <p className="font-display text-2xl">{formatEuro(stats.marge)}</p>
-          </div>
-          <div className="rounded-lg border border-border p-3">
-            <p className="text-xs text-muted-foreground">Marge depuis le 1er juin 2026</p>
-            <p className="font-display text-2xl">{formatEuro(stats.margeDepuis)}</p>
           </div>
         </div>
 
