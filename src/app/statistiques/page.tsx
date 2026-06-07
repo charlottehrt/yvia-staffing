@@ -5,7 +5,8 @@ import { and, eq, gte, lte } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { premierJourDuMois, dernierJourDuMois } from "@/lib/calculs/jours-ouvres";
 import { formatEuro, formatPourcent, formatJours, formatMois } from "@/lib/format";
-import { StatsFiltres, PERIODES, GROUPES } from "./stats-filtres";
+import { StatsFiltres } from "./stats-filtres";
+import { PERIODES, GROUPES } from "./stats-config";
 import { StatsTable, type LigneStat } from "./stats-table";
 
 const arrondi = (n: number) => Math.round(n * 100) / 100;

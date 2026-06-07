@@ -3,22 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-
-export const PERIODES = [
-  { key: "mois", label: "Ce mois" },
-  { key: "trimestre", label: "Trimestre en cours" },
-  { key: "annee", label: "Année en cours" },
-  { key: "12mois", label: "12 prochains mois" },
-  { key: "debut", label: "Depuis le début" },
-  { key: "perso", label: "Personnalisé" },
-] as const;
-
-export const GROUPES = [
-  { key: "mois", label: "Mois" },
-  { key: "freelance", label: "Freelance" },
-  { key: "client", label: "Client" },
-  { key: "mission", label: "Mission" },
-] as const;
+import { PERIODES, GROUPES } from "./stats-config";
 
 const chip = (actif: boolean) =>
   `rounded-md px-3 py-1.5 text-sm ${
