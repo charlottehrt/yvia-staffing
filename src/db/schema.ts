@@ -12,6 +12,15 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
+// --- UTILISATEURS (les 3 associés qui se connectent à l'app) ---
+// Créés à la main (pas d'inscription publique). Mot de passe stocké haché.
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  nom: text("nom"), // nom affiché, optionnel
+});
+
 // --- FREELANCES ---
 export const freelances = pgTable("freelances", {
   id: serial("id").primaryKey(), // identifiant unique, généré automatiquement
