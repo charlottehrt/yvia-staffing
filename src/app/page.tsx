@@ -35,19 +35,17 @@ const moisPrecedent = (a: number, m: number) =>
   m === 1 ? { annee: a - 1, mois: 12 } : { annee: a, mois: m - 1 };
 
 // Palette pour distinguer les missions dans le planning.
-// Teintes volontairement contrastées (hues différents) pour ne pas confondre
-// deux missions voisines. Le bleu de marque reste en premier.
+// Tons désaturés et cohérents avec la DA Yvia (dominante froide), assez
+// différents les uns des autres pour ne pas confondre deux missions voisines.
 const PALETTE: Couleur[] = [
-  { bg: "#0571ed", fg: "#ffffff" }, // bleu
-  { bg: "#f97316", fg: "#ffffff" }, // orange
-  { bg: "#16a34a", fg: "#ffffff" }, // vert
-  { bg: "#9333ea", fg: "#ffffff" }, // violet
-  { bg: "#e11d48", fg: "#ffffff" }, // rose/rouge
-  { bg: "#0891b2", fg: "#ffffff" }, // cyan
-  { bg: "#ca8a04", fg: "#ffffff" }, // jaune foncé
-  { bg: "#4f46e5", fg: "#ffffff" }, // indigo
-  { bg: "#db2777", fg: "#ffffff" }, // magenta
-  { bg: "#65a30d", fg: "#ffffff" }, // vert lime
+  { bg: "#0571ed", fg: "#ffffff" }, // bleu Yvia
+  { bg: "#0b172b", fg: "#ffffff" }, // navy
+  { bg: "#2e8b8b", fg: "#ffffff" }, // sarcelle
+  { bg: "#52698f", fg: "#ffffff" }, // ardoise
+  { bg: "#5b6fb0", fg: "#ffffff" }, // bleu-violet
+  { bg: "#5a8f6b", fg: "#ffffff" }, // vert-de-gris
+  { bg: "#7a5f99", fg: "#ffffff" }, // prune doux
+  { bg: "#b07d3c", fg: "#ffffff" }, // ocre doux
 ];
 
 const LETTRES = ["D", "L", "M", "M", "J", "V", "S"];
