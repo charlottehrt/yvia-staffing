@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { premierJourDuMois, dernierJourDuMois } from "@/lib/calculs/jours-ouvres";
+import { SousOnglets, ONGLETS_ANNUAIRE } from "@/app/sous-onglets";
 import { FreelanceFormDialog } from "./freelance-form-dialog";
 import { FreelanceDetailDialog } from "./freelance-detail-dialog";
 import { ToggleActifButton } from "./toggle-actif-button";
@@ -94,6 +95,7 @@ export default async function PageFreelances({
 
   return (
     <div className="space-y-6">
+      <SousOnglets onglets={ONGLETS_ANNUAIRE} />
       <div className="flex items-center justify-between">
         <h1 className="font-display text-3xl">Freelances</h1>
         <FreelanceFormDialog

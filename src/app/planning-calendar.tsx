@@ -20,6 +20,8 @@ import {
   supprimerEncaissement,
   ajouterDecaissement,
   supprimerDecaissement,
+  ajouterJalon,
+  supprimerJalon,
 } from "./projets/actions";
 
 export type Jour = {
@@ -58,8 +60,8 @@ export type LigneFreelance = {
 
 export type EvenementProjet = {
   id: number;
-  type: "encaissement" | "decaissement";
-  montant: string;
+  type: "encaissement" | "decaissement" | "jalon";
+  montant: string | null; // null pour un jalon (pas de montant)
   libelle: string | null;
   freelanceNom: string | null; // renseigné pour un décaissement
 };
@@ -176,13 +178,20 @@ export function PlanningCalendar({
     if (res.ok) toast.success("Décaissement ajouté.");
     else toast.error(res.message ?? "Erreur.");
   }
+  async function ajouterJal(fd: FormData) {
+    const res = await ajouterJalon(fd);
+    if (res.ok) toast.success("Jalon ajouté.");
+    else toast.error(res.message ?? "Erreur.");
+  }
   async function supprimerEv(ev: EvenementProjet) {
     const fd = new FormData();
     fd.set("id", String(ev.id));
     const res =
       ev.type === "encaissement"
         ? await supprimerEncaissement(fd)
-        : await supprimerDecaissement(fd);
+        : ev.type === "decaissement"
+          ? await supprimerDecaissement(fd)
+          : await supprimerJalon(fd);
     if (res.ok) toast.success("Événement supprimé.");
     else toast.error(res.message ?? "Erreur.");
   }
@@ -231,6 +240,7 @@ export function PlanningCalendar({
                 const ev = p.evenements[j.date] ?? [];
                 const nbEnc = ev.filter((e) => e.type === "encaissement").length;
                 const nbDec = ev.filter((e) => e.type === "decaissement").length;
+                const nbJal = ev.filter((e) => e.type === "jalon").length;
                 return (
                   <td
                     key={j.date}
@@ -252,6 +262,11 @@ export function PlanningCalendar({
                         {nbDec > 0 ? (
                           <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white ring-1 ring-rose-700/30">
                             {nbDec}
+                          </span>
+                        ) : null}
+                        {nbJal > 0 ? (
+                          <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white ring-1 ring-amber-700/30">
+                            {nbJal}
                           </span>
                         ) : null}
                       </div>
@@ -396,17 +411,27 @@ export function PlanningCalendar({
                 >
                   <span
                     className={`size-2 shrink-0 rounded-full ${
-                      ev.type === "encaissement" ? "bg-emerald-500" : "bg-rose-500"
+                      ev.type === "encaissement"
+                        ? "bg-emerald-500"
+                        : ev.type === "decaissement"
+                          ? "bg-rose-500"
+                          : "bg-amber-500"
                     }`}
                   />
                   <span className="shrink-0 font-medium">
-                    {ev.type === "encaissement" ? "Encaissement" : "Décaissement"}
+                    {ev.type === "encaissement"
+                      ? "Encaissement"
+                      : ev.type === "decaissement"
+                        ? "Décaissement"
+                        : "Jalon"}
                   </span>
                   {ev.freelanceNom ? (
                     <span className="shrink-0 text-muted-foreground">{ev.freelanceNom}</span>
                   ) : null}
                   <span className="flex-1 truncate text-muted-foreground">{ev.libelle ?? ""}</span>
-                  <span className="shrink-0 tabular-nums">{formatEuro(Number(ev.montant))}</span>
+                  {ev.montant !== null ? (
+                    <span className="shrink-0 tabular-nums">{formatEuro(Number(ev.montant))}</span>
+                  ) : null}
                   <button
                     onClick={() => supprimerEv(ev)}
                     className="shrink-0 text-muted-foreground hover:text-rose-600"
@@ -452,6 +477,19 @@ export function PlanningCalendar({
             <div className="flex gap-2">
               <Input name="montant" type="number" min="0" step="1" placeholder="Montant €" required />
               <Input name="libelle" placeholder="Libellé (optionnel)" />
+              <Button type="submit" size="sm" variant="outline">
+                Ajouter
+              </Button>
+            </div>
+          </form>
+
+          {/* Ajout d'un jalon (repère sans montant) */}
+          <form action={ajouterJal} className="space-y-2 border-t border-border pt-3">
+            <p className="text-sm font-medium text-amber-600">Ajouter un jalon</p>
+            <input type="hidden" name="projetId" value={String(popupProjet?.projetId ?? "")} />
+            <input type="hidden" name="date" value={popupProjet?.date ?? ""} />
+            <div className="flex gap-2">
+              <Input name="libelle" placeholder="Ex : Livraison V1, recette client…" required />
               <Button type="submit" size="sm" variant="outline">
                 Ajouter
               </Button>

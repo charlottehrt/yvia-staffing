@@ -1,10 +1,18 @@
 "use server";
 
 import { db } from "@/db";
-import { projets, encaissements, decaissements } from "@/db/schema";
+import { projets, clients, encaissements, decaissements, jalons } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { formatEuro } from "@/lib/format";
+import { estFiabilite } from "@/lib/calculs/previsionnel";
+
+// Lit une catégorie de fiabilité depuis le formulaire : une vraie catégorie, ou null
+// (valeur vide / sentinelle "herite" = on laisse la cascade décider).
+function lireFiabilite(formData: FormData): string | null {
+  const v = String(formData.get("fiabilite") ?? "").trim();
+  return estFiabilite(v) ? v : null;
+}
 
 export type Resultat = { ok: boolean; message?: string };
 
@@ -80,6 +88,10 @@ export async function ajouterEncaissement(formData: FormData): Promise<Resultat>
   const date = String(formData.get("date") ?? "").trim();
   const montant = String(formData.get("montant") ?? "").trim();
   const libelle = String(formData.get("libelle") ?? "").trim() || null;
+  // Statut : 'encaisse' (réalisé) par défaut, 'prevu' pour une échéance attendue.
+  const statut = String(formData.get("statut")) === "prevu" ? "prevu" : "encaisse";
+  // Fiabilité seulement pertinente pour une échéance prévue.
+  const fiabilite = statut === "prevu" ? lireFiabilite(formData) : null;
 
   if (!projetId) return { ok: false, message: "Projet introuvable." };
   if (!date) return { ok: false, message: "La date est obligatoire." };
@@ -90,19 +102,19 @@ export async function ajouterEncaissement(formData: FormData): Promise<Resultat>
   const [p] = await db.select({ budget: projets.budget }).from(projets).where(eq(projets.id, projetId));
   if (!p) return { ok: false, message: "Projet introuvable." };
 
-  // Blocage : on ne peut pas encaisser au-delà du budget.
-  const encaisse = await totalEncaisse(projetId);
-  if (encaisse + Number(montant) > Number(p.budget)) {
-    const reste = Number(p.budget) - encaisse;
+  // Garde-fou : l'échéancier (prévu + encaissé) ne peut pas dépasser le budget.
+  const planifie = await totalEncaisse(projetId);
+  if (planifie + Number(montant) > Number(p.budget)) {
+    const reste = Number(p.budget) - planifie;
     return {
       ok: false,
-      message: `Cet encaissement dépasse le budget du projet (reste à facturer : ${formatEuro(
+      message: `Cette échéance dépasse le budget du projet (reste à planifier : ${formatEuro(
         reste
       )}). Modifiez l'enveloppe budgétaire du projet pour pouvoir l'ajouter.`,
     };
   }
 
-  await db.insert(encaissements).values({ projetId, date, montant, libelle });
+  await db.insert(encaissements).values({ projetId, date, montant, libelle, statut, fiabilite });
   rafraichir();
   return { ok: true };
 }
@@ -122,6 +134,9 @@ export async function ajouterDecaissement(formData: FormData): Promise<Resultat>
   const montant = String(formData.get("montant") ?? "").trim();
   const libelle = String(formData.get("libelle") ?? "").trim() || null;
 
+  // Statut : 'decaisse' (réalisé) par défaut, 'prevu' pour un coût à venir.
+  const statut = String(formData.get("statut")) === "prevu" ? "prevu" : "decaisse";
+
   if (!projetId) return { ok: false, message: "Projet introuvable." };
   if (!freelanceId) return { ok: false, message: "Le freelance est obligatoire." };
   if (!date) return { ok: false, message: "La date est obligatoire." };
@@ -129,7 +144,7 @@ export async function ajouterDecaissement(formData: FormData): Promise<Resultat>
     return { ok: false, message: "Le montant doit être supérieur à 0." };
   }
 
-  await db.insert(decaissements).values({ projetId, freelanceId, date, montant, libelle });
+  await db.insert(decaissements).values({ projetId, freelanceId, date, montant, libelle, statut });
   rafraichir();
   return { ok: true };
 }
@@ -138,6 +153,71 @@ export async function supprimerDecaissement(formData: FormData): Promise<Resulta
   const id = Number(formData.get("id"));
   if (!id) return { ok: false, message: "Décaissement introuvable." };
   await db.delete(decaissements).where(eq(decaissements.id, id));
+  rafraichir();
+  return { ok: true };
+}
+
+// Bascule une échéance de recette prévue en réalisée (encaissée).
+export async function marquerEncaissementRealise(formData: FormData): Promise<Resultat> {
+  const id = Number(formData.get("id"));
+  if (!id) return { ok: false, message: "Échéance introuvable." };
+  await db.update(encaissements).set({ statut: "encaisse" }).where(eq(encaissements.id, id));
+  rafraichir();
+  return { ok: true };
+}
+
+// Bascule une échéance de coût prévue en réalisée (décaissée).
+export async function marquerDecaissementRealise(formData: FormData): Promise<Resultat> {
+  const id = Number(formData.get("id"));
+  if (!id) return { ok: false, message: "Échéance introuvable." };
+  await db.update(decaissements).set({ statut: "decaisse" }).where(eq(decaissements.id, id));
+  rafraichir();
+  return { ok: true };
+}
+
+// Fiabilité de paiement par défaut d'un client (vide = aucune).
+export async function definirFiabiliteClient(formData: FormData): Promise<Resultat> {
+  const clientId = Number(formData.get("clientId"));
+  if (!clientId) return { ok: false, message: "Client introuvable." };
+  await db
+    .update(clients)
+    .set({ fiabiliteDefaut: lireFiabilite(formData) })
+    .where(eq(clients.id, clientId));
+  rafraichir();
+  return { ok: true };
+}
+
+// Fiabilité par défaut d'un projet (vide = hérite du client).
+export async function definirFiabiliteProjet(formData: FormData): Promise<Resultat> {
+  const projetId = Number(formData.get("projetId"));
+  if (!projetId) return { ok: false, message: "Projet introuvable." };
+  await db
+    .update(projets)
+    .set({ fiabiliteDefaut: lireFiabilite(formData) })
+    .where(eq(projets.id, projetId));
+  rafraichir();
+  return { ok: true };
+}
+
+// --- JALONS : repères datés, sans montant. N'impactent pas la marge. ---
+export async function ajouterJalon(formData: FormData): Promise<Resultat> {
+  const projetId = Number(formData.get("projetId"));
+  const date = String(formData.get("date") ?? "").trim();
+  const libelle = String(formData.get("libelle") ?? "").trim();
+
+  if (!projetId) return { ok: false, message: "Projet introuvable." };
+  if (!date) return { ok: false, message: "La date est obligatoire." };
+  if (!libelle) return { ok: false, message: "Le libellé du jalon est obligatoire." };
+
+  await db.insert(jalons).values({ projetId, date, libelle });
+  rafraichir();
+  return { ok: true };
+}
+
+export async function supprimerJalon(formData: FormData): Promise<Resultat> {
+  const id = Number(formData.get("id"));
+  if (!id) return { ok: false, message: "Jalon introuvable." };
+  await db.delete(jalons).where(eq(jalons.id, id));
   rafraichir();
   return { ok: true };
 }

@@ -46,6 +46,9 @@ export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
   nom: text("nom").notNull(), // nom de la société
   actif: boolean("actif").notNull().default(true), // true = actif, false = archivé
+  // Fiabilité de paiement par défaut du client (catégorie : securise/probable/incertain/arisque).
+  // Optionnel : sert de valeur par défaut dans la cascade du prévisionnel.
+  fiabiliteDefaut: text("fiabilite_defaut"),
 });
 
 // --- MISSIONS ---
@@ -101,20 +104,42 @@ export const projets = pgTable("projets", {
   nom: text("nom").notNull(),
   budget: numeric("budget", { precision: 12, scale: 2 }).notNull(), // € HT, enveloppe vendue
   actif: boolean("actif").notNull().default(true), // true = actif, false = archivé
+  // Surcharge de fiabilité au niveau projet. Vide = hérite du client (cf. cascade prévisionnel).
+  fiabiliteDefaut: text("fiabilite_defaut"),
 });
 
-// --- ENCAISSEMENTS (argent reçu du client, rattaché à un projet) ---
-export const encaissements = pgTable("encaissements", {
+// --- JALONS (forfait) : repères datés d'un projet, SANS impact financier ---
+// Ni encaissement ni décaissement : juste une étape clé du projet (ex : kickoff,
+// livraison V1, recette) qui s'affiche dans le planning pour donner du contexte.
+export const jalons = pgTable("jalons", {
   id: serial("id").primaryKey(),
   projetId: integer("projet_id")
     .notNull()
     .references(() => projets.id, { onDelete: "cascade" }),
   date: date("date").notNull(),
-  montant: numeric("montant", { precision: 12, scale: 2 }).notNull(), // € HT
-  libelle: text("libelle"), // optionnel (ex : acompte, jalon 1...)
+  libelle: text("libelle").notNull(), // ce qui décrit l'étape (obligatoire)
 });
 
-// --- DECAISSEMENTS (argent versé à un freelance, rattaché à un projet) ---
+// --- ENCAISSEMENTS / ÉCHÉANCIER DE RECETTE (argent du client, rattaché à un projet) ---
+// Une ligne = une échéance de recette. statut='encaisse' = argent reçu (certain),
+// statut='prevu' = paiement attendu (pondéré par sa fiabilité dans le prévisionnel).
+export const encaissements = pgTable("encaissements", {
+  id: serial("id").primaryKey(),
+  projetId: integer("projet_id")
+    .notNull()
+    .references(() => projets.id, { onDelete: "cascade" }),
+  date: date("date").notNull(), // date réelle si encaissé, date attendue si prévu
+  montant: numeric("montant", { precision: 12, scale: 2 }).notNull(), // € HT
+  libelle: text("libelle"), // optionnel (ex : acompte, jalon 1...)
+  statut: text("statut").notNull().default("encaisse"), // 'encaisse' | 'prevu'
+  // Fiabilité propre à cette échéance (catégorie). Vide = hérite du projet/client.
+  // N'a de sens que pour une échéance 'prevu'.
+  fiabilite: text("fiabilite"),
+});
+
+// --- DECAISSEMENTS / ÉCHÉANCIER DE COÛT (versé à un freelance, rattaché à un projet) ---
+// statut='decaisse' = déjà versé (réalisé), statut='prevu' = coût à venir.
+// Pas de fiabilité côté coût : un coût engagé est considéré certain (100 %).
 export const decaissements = pgTable("decaissements", {
   id: serial("id").primaryKey(),
   projetId: integer("projet_id")
@@ -123,7 +148,8 @@ export const decaissements = pgTable("decaissements", {
   freelanceId: integer("freelance_id")
     .notNull()
     .references(() => freelances.id),
-  date: date("date").notNull(),
+  date: date("date").notNull(), // date réelle si décaissé, date attendue si prévu
   montant: numeric("montant", { precision: 12, scale: 2 }).notNull(), // € HT
   libelle: text("libelle"), // optionnel
+  statut: text("statut").notNull().default("decaisse"), // 'decaisse' | 'prevu'
 });

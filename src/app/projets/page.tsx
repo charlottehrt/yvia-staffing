@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/db";
-import { projets, clients, freelances, encaissements, decaissements } from "@/db/schema";
+import { projets, clients, freelances, encaissements, decaissements, jalons } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,8 +18,16 @@ import { ProjetDetailDialog } from "./projet-detail-dialog";
 import { ArchiveProjetButton } from "./archive-projet-button";
 import { creerProjet, modifierProjet } from "./actions";
 
-type Evenement = { id: number; date: string; montant: string; libelle: string | null };
+type Evenement = {
+  id: number;
+  date: string;
+  montant: string;
+  libelle: string | null;
+  statut: string; // 'encaisse'/'prevu' (recette) ou 'decaisse'/'prevu' (coût)
+  fiabilite: string | null; // seulement côté recette
+};
 type Decaissement = Evenement & { freelanceNom: string };
+type Jalon = { id: number; date: string; libelle: string };
 
 export default async function PageProjets({
   searchParams,
@@ -36,6 +44,8 @@ export default async function PageProjets({
       budget: projets.budget,
       clientId: projets.clientId,
       clientNom: clients.nom,
+      clientFiabilite: clients.fiabiliteDefaut,
+      fiabiliteDefaut: projets.fiabiliteDefaut,
       actif: projets.actif,
     })
     .from(projets)
@@ -43,6 +53,8 @@ export default async function PageProjets({
     .where(eq(projets.actif, !archives))
     .orderBy(projets.nom);
 
+  // On récupère TOUT l'échéancier (prévu + réalisé) : le dialogue "Gérer" en a besoin.
+  // Les colonnes du tableau, elles, ne compteront que le réalisé (filtré plus bas).
   const encRows = await db
     .select({
       id: encaissements.id,
@@ -50,6 +62,8 @@ export default async function PageProjets({
       date: encaissements.date,
       montant: encaissements.montant,
       libelle: encaissements.libelle,
+      statut: encaissements.statut,
+      fiabilite: encaissements.fiabilite,
     })
     .from(encaissements);
 
@@ -60,6 +74,7 @@ export default async function PageProjets({
       date: decaissements.date,
       montant: decaissements.montant,
       libelle: decaissements.libelle,
+      statut: decaissements.statut,
       prenom: freelances.prenom,
       nom: freelances.nom,
     })
@@ -69,7 +84,7 @@ export default async function PageProjets({
   const encParProjet = new Map<number, Evenement[]>();
   for (const e of encRows) {
     const arr = encParProjet.get(e.projetId) ?? [];
-    arr.push({ id: e.id, date: e.date, montant: e.montant, libelle: e.libelle });
+    arr.push({ id: e.id, date: e.date, montant: e.montant, libelle: e.libelle, statut: e.statut, fiabilite: e.fiabilite });
     encParProjet.set(e.projetId, arr);
   }
   const decParProjet = new Map<number, Decaissement[]>();
@@ -80,9 +95,26 @@ export default async function PageProjets({
       date: d.date,
       montant: d.montant,
       libelle: d.libelle,
+      statut: d.statut,
+      fiabilite: null,
       freelanceNom: `${d.prenom} ${d.nom}`,
     });
     decParProjet.set(d.projetId, arr);
+  }
+
+  const jalRows = await db
+    .select({
+      id: jalons.id,
+      projetId: jalons.projetId,
+      date: jalons.date,
+      libelle: jalons.libelle,
+    })
+    .from(jalons);
+  const jalParProjet = new Map<number, Jalon[]>();
+  for (const j of jalRows) {
+    const arr = jalParProjet.get(j.projetId) ?? [];
+    arr.push({ id: j.id, date: j.date, libelle: j.libelle });
+    jalParProjet.set(j.projetId, arr);
   }
 
   const somme = (arr: Evenement[]) => arr.reduce((s, x) => s + Number(x.montant), 0);
@@ -165,8 +197,10 @@ export default async function PageProjets({
                 {liste.map((p) => {
                   const enc = encParProjet.get(p.id) ?? [];
                   const dec = decParProjet.get(p.id) ?? [];
-                  const totalEnc = somme(enc);
-                  const totalDec = somme(dec);
+                  const jal = jalParProjet.get(p.id) ?? [];
+                  // Colonnes du tableau = RÉALISÉ uniquement (le prévu vit dans le prévisionnel).
+                  const totalEnc = somme(enc.filter((e) => e.statut !== "prevu"));
+                  const totalDec = somme(dec.filter((d) => d.statut !== "prevu"));
                   const marge = totalEnc - totalDec;
                   const reste = Number(p.budget) - totalEnc;
                   return (
@@ -183,9 +217,18 @@ export default async function PageProjets({
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <ProjetDetailDialog
-                            projet={{ id: p.id, nom: p.nom, clientNom: p.clientNom, budget: p.budget }}
+                            projet={{
+                              id: p.id,
+                              nom: p.nom,
+                              clientId: p.clientId,
+                              clientNom: p.clientNom,
+                              budget: p.budget,
+                              fiabiliteDefaut: p.fiabiliteDefaut,
+                              clientFiabilite: p.clientFiabilite,
+                            }}
                             encaissements={enc}
                             decaissements={dec}
+                            jalons={jal}
                             freelancesActifs={freelancesActifs}
                           />
                           <ProjetFormDialog

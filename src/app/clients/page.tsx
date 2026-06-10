@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { premierJourDuMois, dernierJourDuMois } from "@/lib/calculs/jours-ouvres";
+import { SousOnglets, ONGLETS_ANNUAIRE } from "@/app/sous-onglets";
 import { ClientFormDialog } from "./client-form-dialog";
 import { ClientDetailDialog } from "./client-detail-dialog";
 import { ArchiveClientButton } from "./archive-client-button";
@@ -96,6 +97,7 @@ export default async function PageClients({
 
   return (
     <div className="space-y-6">
+      <SousOnglets onglets={ONGLETS_ANNUAIRE} />
       <div className="flex items-center justify-between">
         <h1 className="font-display text-3xl">Clients</h1>
         <ClientFormDialog

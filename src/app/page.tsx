@@ -9,6 +9,7 @@ import {
   projets,
   encaissements,
   decaissements,
+  jalons,
 } from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -136,7 +137,13 @@ export default async function PagePlanning({
       libelle: encaissements.libelle,
     })
     .from(encaissements)
-    .where(and(gte(encaissements.date, debutMois), lte(encaissements.date, finMois)));
+    .where(
+      and(
+        eq(encaissements.statut, "encaisse"), // réalisé uniquement (le prévu ne compte pas comme CA)
+        gte(encaissements.date, debutMois),
+        lte(encaissements.date, finMois)
+      )
+    );
 
   const decMois = await db
     .select({
@@ -150,17 +157,37 @@ export default async function PagePlanning({
     })
     .from(decaissements)
     .innerJoin(freelances, eq(decaissements.freelanceId, freelances.id))
-    .where(and(gte(decaissements.date, debutMois), lte(decaissements.date, finMois)));
+    .where(
+      and(
+        eq(decaissements.statut, "decaisse"), // coût réalisé uniquement
+        gte(decaissements.date, debutMois),
+        lte(decaissements.date, finMois)
+      )
+    );
+
+  const jalMois = await db
+    .select({
+      id: jalons.id,
+      projetId: jalons.projetId,
+      date: jalons.date,
+      libelle: jalons.libelle,
+    })
+    .from(jalons)
+    .where(and(gte(jalons.date, debutMois), lte(jalons.date, finMois)));
 
   // Événements regroupés par projet puis par date.
-  const evenementsParProjet = new Map<
-    number,
-    Record<string, { id: number; type: "encaissement" | "decaissement"; montant: string; libelle: string | null; freelanceNom: string | null }[]>
-  >();
+  type EvenementProjet = {
+    id: number;
+    type: "encaissement" | "decaissement" | "jalon";
+    montant: string | null; // null pour un jalon (pas de montant)
+    libelle: string | null;
+    freelanceNom: string | null;
+  };
+  const evenementsParProjet = new Map<number, Record<string, EvenementProjet[]>>();
   const ajouterEvenement = (
     projetId: number,
     date: string,
-    ev: { id: number; type: "encaissement" | "decaissement"; montant: string; libelle: string | null; freelanceNom: string | null }
+    ev: EvenementProjet
   ) => {
     const parDate = evenementsParProjet.get(projetId) ?? {};
     parDate[date] = [...(parDate[date] ?? []), ev];
@@ -181,6 +208,14 @@ export default async function PagePlanning({
       montant: d.montant,
       libelle: d.libelle,
       freelanceNom: `${d.prenom} ${d.nom}`,
+    });
+  for (const j of jalMois)
+    ajouterEvenement(j.projetId, j.date, {
+      id: j.id,
+      type: "jalon",
+      montant: null,
+      libelle: j.libelle,
+      freelanceNom: null,
     });
 
   const projetsLignes = projetsActifs.map((p) => ({
