@@ -18,6 +18,7 @@ import { PERIODES, GROUPES } from "./stats-config";
 import { StatsTable, type LigneStat } from "./stats-table";
 import { StatsExport } from "./stats-export";
 import { MultiSelectFiltre } from "./multi-select-filtre";
+import { SousOnglets, ONGLETS_FINANCES } from "@/app/sous-onglets";
 
 const arrondi = (n: number) => Math.round(n * 100) / 100;
 
@@ -143,7 +144,11 @@ export default async function PageStatistiques({
 
   if (forfaitActif) {
     if (selFreelances.length === 0) {
-      const condEnc = [gte(encaissements.date, debut), lte(encaissements.date, fin)];
+      const condEnc = [
+        eq(encaissements.statut, "encaisse"), // réalisé uniquement (les stats restent factuelles)
+        gte(encaissements.date, debut),
+        lte(encaissements.date, fin),
+      ];
       if (selClients.length) condEnc.push(inArray(projets.clientId, selClients));
       encForfait = await db
         .select({
@@ -159,7 +164,11 @@ export default async function PageStatistiques({
         .innerJoin(clients, eq(projets.clientId, clients.id))
         .where(and(...condEnc));
     }
-    const condDec = [gte(decaissements.date, debut), lte(decaissements.date, fin)];
+    const condDec = [
+      eq(decaissements.statut, "decaisse"), // coût réalisé uniquement
+      gte(decaissements.date, debut),
+      lte(decaissements.date, fin),
+    ];
     if (selClients.length) condDec.push(inArray(projets.clientId, selClients));
     if (selFreelances.length) condDec.push(inArray(decaissements.freelanceId, selFreelances));
     decForfait = await db
@@ -275,6 +284,7 @@ export default async function PageStatistiques({
 
   return (
     <div className="space-y-6">
+      <SousOnglets onglets={ONGLETS_FINANCES} />
       <h1 className="font-display text-3xl">Statistiques</h1>
 
       <Card>

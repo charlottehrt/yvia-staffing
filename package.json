@@ -10,6 +10,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "creer-utilisateur": "node scripts/creer-utilisateur.mjs",
+    "seed": "node scripts/seed.mjs",
+    "seed:simulation": "node scripts/seed-simulation.mjs",
     "test": "vitest"
   },
   "dependencies": {

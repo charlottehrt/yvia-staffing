@@ -4,13 +4,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// `match` = préfixes de chemin qui rendent l'onglet actif (pour les regroupements).
 const liens = [
-  { href: "/", label: "Dashboard" },
+  { href: "/", label: "Planning", match: ["/"] },
   { href: "/missions", label: "Missions" },
   { href: "/projets", label: "Projets" },
-  { href: "/freelances", label: "Freelances" },
-  { href: "/clients", label: "Clients" },
-  { href: "/statistiques", label: "Statistiques" },
+  { href: "/clients", label: "Annuaire", match: ["/clients", "/freelances"] },
+  { href: "/statistiques", label: "Finances", match: ["/statistiques", "/previsionnel"] },
 ];
 
 export function NavLinks() {
@@ -19,8 +19,10 @@ export function NavLinks() {
   return (
     <>
       {liens.map((lien) => {
-        const actif =
-          lien.href === "/" ? pathname === "/" : pathname.startsWith(lien.href);
+        const motifs = lien.match ?? [lien.href];
+        const actif = motifs.some((m) =>
+          m === "/" ? pathname === "/" : pathname.startsWith(m)
+        );
         return (
           <Link
             key={lien.href}

@@ -39,6 +39,16 @@ echo "DATABASE_URL=\"${DB_URL}\"" >> .env.tmp
 mv .env.tmp .env
 echo "→ .env : DATABASE_URL pointe vers le port ${DB_PORT}"
 
+# --- SESSION_SECRET : secret de signature des sessions (obligatoire) ---
+# Chaque workspace a besoin de sa propre valeur, sinon l'application plante au
+# démarrage de l'authentification. On la génère une seule fois puis on la
+# conserve : la régénérer à chaque lancement invaliderait les sessions ouvertes.
+if ! grep -q '^SESSION_SECRET=' .env 2>/dev/null; then
+  SECRET="$(openssl rand -hex 32 2>/dev/null || node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
+  echo "SESSION_SECRET=\"${SECRET}\"" >> .env
+  echo "→ .env : SESSION_SECRET généré"
+fi
+
 # --- Démarrage de la base ---
 echo "→ Démarrage de PostgreSQL (projet '${COMPOSE_PROJECT_NAME}', port ${DB_PORT})..."
 docker compose up -d
