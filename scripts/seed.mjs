@@ -8,7 +8,7 @@ import "dotenv/config";
 import postgres from "postgres";
 import { scryptSync, randomBytes } from "node:crypto";
 
-const email = (process.env.SEED_ADMIN_EMAIL ?? "admin@yvia.fr").toLowerCase();
+const email = (process.env.SEED_ADMIN_EMAIL ?? "admin@yvia.io").toLowerCase();
 const motDePasse = process.env.SEED_ADMIN_PASSWORD ?? "admin";
 const nom = process.env.SEED_ADMIN_NOM ?? "Admin";
 

@@ -70,4 +70,10 @@ npm install
 echo "→ Création / mise à jour des tables..."
 npm run db:push
 
+# Compte admin de démonstration (admin@yvia.io / admin). Upsert idempotent :
+# relancer le setup ne casse rien. Le seeder de simulation (seed:simulation)
+# reste manuel, lui REMET À ZÉRO les données métier.
+echo "→ Création du compte admin de démonstration..."
+npm run seed
+
 echo "✅ Environnement prêt. L'application tournera sur le port ${APP_PORT}."
