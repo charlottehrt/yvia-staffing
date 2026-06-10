@@ -1,0 +1,7 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+archive = "./scripts/worktree-down.sh --purge"
+run = "npm run dev -- -p \"$CONDUCTOR_PORT\""
+run_mode = "concurrent"
+setup = "./scripts/worktree-up.sh"
