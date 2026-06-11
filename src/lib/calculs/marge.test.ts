@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { margeParJour, calculMarge } from "./marge";
+import { calculMissionRealisee, margeParJour, calculMarge } from "./marge";
 
 describe("marge par jour", () => {
   it("est la différence entre TJM vente et TJM achat", () => {
@@ -30,5 +30,18 @@ describe("calcul de marge d'une mission", () => {
     expect(r.ca).toBe(0);
     expect(r.marge).toBe(0);
     expect(r.tauxMarge).toBe(0);
+  });
+});
+
+describe("réalisé d'une mission", () => {
+  it("cumule le CA généré, la marge et les jours facturés depuis les affectations", () => {
+    const r = calculMissionRealisee([
+      { tjmAchat: "500", tjmVente: "700" },
+      { tjmAchat: "520.50", tjmVente: "710.25" },
+    ]);
+
+    expect(r.joursFactures).toBe(2);
+    expect(r.ca).toBe(1410.25);
+    expect(r.marge).toBe(389.75);
   });
 });

@@ -7,7 +7,8 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/server";
 
-export type Resultat = { ok: boolean; message?: string };
+export type ClientCree = { id: number; nom: string };
+export type Resultat = { ok: false; message?: string } | { ok: true; client?: ClientCree };
 
 async function verifierConnecte(): Promise<Resultat> {
   if (await getSession()) return { ok: true };
@@ -21,9 +22,15 @@ export async function creerClient(formData: FormData): Promise<Resultat> {
   const nom = String(formData.get("nom") ?? "").trim();
   if (!nom) return { ok: false, message: "Le nom de la société est obligatoire." };
 
-  await db.insert(clients).values({ nom });
+  const [client] = await db
+    .insert(clients)
+    .values({ nom })
+    .returning({ id: clients.id, nom: clients.nom });
   revalidatePath("/clients");
-  return { ok: true };
+  revalidatePath("/missions");
+  revalidatePath("/projets");
+  revalidatePath("/");
+  return { ok: true, client };
 }
 
 export async function modifierClient(formData: FormData): Promise<Resultat> {

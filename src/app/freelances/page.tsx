@@ -5,6 +5,7 @@ import { freelances, affectations } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ListViewToolbar } from "@/components/list-view-toolbar";
 import {
   Table,
   TableBody,
@@ -47,15 +48,15 @@ export default async function PageFreelances({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
-        <FreelanceFormDialog
-          action={creerFreelance}
-          titre="Nouveau freelance"
-          trigger={<Button>Nouveau freelance</Button>}
-        />
-      </div>
-
-      <div className="flex gap-1">
+      <ListViewToolbar
+        action={
+          <FreelanceFormDialog
+            action={creerFreelance}
+            titre="Nouveau freelance"
+            trigger={<Button>Nouveau freelance</Button>}
+          />
+        }
+      >
         <Link
           href="/freelances"
           className={`rounded-md px-3 py-1.5 text-sm ${
@@ -72,7 +73,7 @@ export default async function PageFreelances({
         >
           Archives
         </Link>
-      </div>
+      </ListViewToolbar>
 
       <Card>
         <CardHeader>

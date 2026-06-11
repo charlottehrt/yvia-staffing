@@ -14,6 +14,11 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { formatEuro, formatDate } from "@/lib/format";
+import { ajouterFreelanceLocal, ajouterMissionPlanningLocal } from "@/lib/entity-options";
+import { FreelanceFormDialog } from "./freelances/freelance-form-dialog";
+import { creerFreelance } from "./freelances/actions";
+import { MissionFormDialog } from "./missions/mission-form-dialog";
+import { creerMission } from "./missions/actions";
 import { affecterJours, libererJours, modifierTjmAffectation } from "./planning-actions";
 import {
   ajouterEncaissement,
@@ -74,17 +79,34 @@ export type LigneProjet = {
   evenements: Record<string, EvenementProjet[]>; // date -> événements
 };
 
+const COULEURS_MISSION: Couleur[] = [
+  { bg: "#0571ed", fg: "#ffffff" },
+  { bg: "#0b172b", fg: "#ffffff" },
+  { bg: "#2e8b8b", fg: "#ffffff" },
+  { bg: "#52698f", fg: "#ffffff" },
+  { bg: "#5b6fb0", fg: "#ffffff" },
+  { bg: "#5a8f6b", fg: "#ffffff" },
+  { bg: "#7a5f99", fg: "#ffffff" },
+  { bg: "#b07d3c", fg: "#ffffff" },
+];
+
 export function PlanningCalendar({
   jours,
   lignes,
   projets,
   freelancesActifs,
+  clientsActifs,
 }: {
   jours: Jour[];
   lignes: LigneFreelance[];
   projets: LigneProjet[];
   freelancesActifs: { id: number; prenom: string; nom: string }[];
+  clientsActifs: { id: number; nom: string }[];
 }) {
+  const [lignesPlanning, setLignesPlanning] = useState(lignes);
+  const [freelancesOptions, setFreelancesOptions] = useState(freelancesActifs);
+  const [freelanceDecaissementId, setFreelanceDecaissementId] = useState("");
+
   // Pop-up d'événements d'un projet, pour une date donnée.
   const [popupProjet, setPopupProjet] = useState<{ projetId: number; date: string } | null>(null);
   // Étape d'ajout d'un événement dans le pop-up projet :
@@ -128,7 +150,7 @@ export function PlanningCalendar({
     return index >= min && index <= max;
   }
 
-  const ligneActive = popup ? lignes.find((l) => l.id === popup.freelanceId) : null;
+  const ligneActive = popup ? lignesPlanning.find((l) => l.id === popup.freelanceId) : null;
 
   function fermerPopup() {
     setPopup(null);
@@ -189,6 +211,7 @@ export function PlanningCalendar({
     if (res.ok) {
       toast.success("Décaissement ajouté.");
       setTypeAjout("");
+      setFreelanceDecaissementId("");
     } else toast.error(res.message ?? "Erreur.");
   }
   async function ajouterJal(fd: FormData) {
@@ -294,7 +317,7 @@ export function PlanningCalendar({
               })}
             </tr>
           ))}
-          {lignes.map((ligne) => (
+          {lignesPlanning.map((ligne) => (
             <tr key={ligne.id}>
               <td className="sticky left-0 z-10 border-b border-border bg-card px-3 py-1 font-medium whitespace-nowrap">
                 {ligne.nom}
@@ -384,7 +407,42 @@ export function PlanningCalendar({
             </p>
           )}
 
-          <div className="pt-2">
+          <div className="flex flex-wrap gap-2 pt-2">
+            <MissionFormDialog
+              action={creerMission}
+              titre="Nouvelle mission"
+              freelancesActifs={freelancesOptions}
+              clientsListe={clientsActifs}
+              freelanceIdInitial={popup?.freelanceId}
+              trigger={
+                <Button type="button" variant="outline" size="sm">
+                  Créer une mission
+                </Button>
+              }
+              onCreated={(mission) => {
+                setLignesPlanning((actuelles) => {
+                  const ids = Array.from(
+                    new Set([
+                      ...actuelles.flatMap((ligne) => ligne.missions.map((m) => m.id)),
+                      mission.id,
+                    ])
+                  ).sort((a, b) => a - b);
+                  const couleur =
+                    COULEURS_MISSION[ids.indexOf(mission.id) % COULEURS_MISSION.length];
+
+                  return ajouterMissionPlanningLocal(
+                    actuelles,
+                    {
+                      id: mission.id,
+                      nom: mission.nom,
+                      freelanceId: mission.freelanceId,
+                      clientNom: mission.clientNom,
+                    },
+                    couleur
+                  );
+                });
+              }}
+            />
             <ConfirmDialog
               trigger={
                 <Button variant="outline" size="sm">
@@ -408,6 +466,7 @@ export function PlanningCalendar({
           if (!o) {
             setPopupProjet(null);
             setTypeAjout("");
+            setFreelanceDecaissementId("");
           }
         }}
       >
@@ -579,17 +638,34 @@ export function PlanningCalendar({
                 <input type="hidden" name="date" value={popupProjet?.date ?? ""} />
                 <div className="space-y-1">
                   <Label htmlFor="dec-freelance">Freelance</Label>
-                  <Select
-                    id="dec-freelance"
-                    name="freelanceId"
-                    required
-                    defaultValue=""
-                    placeholder="Choisir un freelance"
-                    options={freelancesActifs.map((f) => ({
-                      value: f.id,
-                      label: `${f.prenom} ${f.nom}`,
-                    }))}
-                  />
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                    <Select
+                      id="dec-freelance"
+                      name="freelanceId"
+                      required
+                      value={freelanceDecaissementId}
+                      onValueChange={setFreelanceDecaissementId}
+                      placeholder="Choisir un freelance"
+                      options={freelancesOptions.map((f) => ({
+                        value: f.id,
+                        label: `${f.prenom} ${f.nom}`,
+                      }))}
+                    />
+                    <FreelanceFormDialog
+                      action={creerFreelance}
+                      titre="Nouveau freelance"
+                      trigger={
+                        <Button type="button" variant="outline">
+                          Créer
+                        </Button>
+                      }
+                      onCreated={(freelance) => {
+                        const resultat = ajouterFreelanceLocal(freelancesOptions, freelance);
+                        setFreelancesOptions(resultat.options);
+                        setFreelanceDecaissementId(resultat.selectedId);
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="dec-montant">Montant (€)</Label>

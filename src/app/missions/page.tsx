@@ -5,6 +5,7 @@ import { missions, freelances, clients } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ListViewToolbar } from "@/components/list-view-toolbar";
 import {
   Table,
   TableBody,
@@ -64,17 +65,17 @@ export default async function PageMissions({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
-        <MissionFormDialog
-          action={creerMission}
-          titre="Nouvelle mission"
-          freelancesActifs={freelancesActifs}
-          clientsListe={clientsActifs}
-          trigger={<Button>Nouvelle mission</Button>}
-        />
-      </div>
-
-      <div className="flex gap-1">
+      <ListViewToolbar
+        action={
+          <MissionFormDialog
+            action={creerMission}
+            titre="Nouvelle mission"
+            freelancesActifs={freelancesActifs}
+            clientsListe={clientsActifs}
+            trigger={<Button>Nouvelle mission</Button>}
+          />
+        }
+      >
         {filtres.map((f) => (
           <Link
             key={f.slug}
@@ -88,7 +89,7 @@ export default async function PageMissions({
             {f.label}
           </Link>
         ))}
-      </div>
+      </ListViewToolbar>
 
       <Card>
         <CardHeader>
@@ -112,6 +113,7 @@ export default async function PageMissions({
                   <TableHead className="text-right">TJM achat</TableHead>
                   <TableHead className="text-right">TJM vente</TableHead>
                   <TableHead className="text-right">Marge / jour</TableHead>
+                  <TableHead>Statut</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

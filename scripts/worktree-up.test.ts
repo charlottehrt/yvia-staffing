@@ -25,6 +25,13 @@ function writeExecutable(path: string, contents: string) {
   chmodSync(path, 0o755);
 }
 
+function envWithoutConductor() {
+  const env = { ...process.env };
+  delete env.CONDUCTOR_PORT;
+  delete env.CONDUCTOR_WORKSPACE_NAME;
+  return env;
+}
+
 function listen(server: net.Server, port: number) {
   return new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -120,10 +127,120 @@ printf 'test-secret'
         `.env : DATABASE_URL pointe vers le port ${freePort}`
       );
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-      expect(readFileSync(join(projectDir, ".env"), "utf8")).toContain(`localhost:${freePort}`);
+      const envFile = readFileSync(join(projectDir, ".env"), "utf8");
+      expect(envFile).toContain(`DB_PORT="${freePort}"`);
+      expect(envFile).toContain(`localhost:${freePort}`);
       expect(readFileSync(dockerLog, "utf8")).toContain(`DB_PORT=${freePort}`);
     } finally {
       await close(blocker);
     }
+  });
+
+  it("skips an occupied manual database port", async () => {
+    const { blocker, occupiedPort, freePort } = await findOccupiedPortWithFreeSuccessor();
+    try {
+      const projectDir = mkdtempSync(join(tmpdir(), "worktree-up-"));
+      tempDirs.push(projectDir);
+      mkdirSync(join(projectDir, "scripts"));
+      mkdirSync(join(projectDir, "bin"));
+
+      writeFileSync(
+        join(projectDir, "scripts", "worktree-up.sh"),
+        readFileSync(join(import.meta.dirname, "worktree-up.sh"), "utf8")
+      );
+      chmodSync(join(projectDir, "scripts", "worktree-up.sh"), 0o755);
+
+      const dockerLog = join(projectDir, "docker.log");
+
+      writeExecutable(
+        join(projectDir, "bin", "docker"),
+        `#!/usr/bin/env bash
+echo "$* DB_PORT=$DB_PORT COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME" >> "${dockerLog}"
+exit 0
+`
+      );
+      writeExecutable(
+        join(projectDir, "bin", "npm"),
+        `#!/usr/bin/env bash
+exit 0
+`
+      );
+      writeExecutable(
+        join(projectDir, "bin", "openssl"),
+        `#!/usr/bin/env bash
+printf 'test-secret'
+`
+      );
+
+      const result = spawnSync("bash", ["scripts/worktree-up.sh"], {
+        cwd: projectDir,
+        encoding: "utf8",
+        env: {
+          ...envWithoutConductor(),
+          DB_PORT: String(occupiedPort),
+          PATH: `${join(projectDir, "bin")}:${process.env.PATH ?? ""}`,
+        },
+      });
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(readFileSync(join(projectDir, ".env"), "utf8")).toContain(`DB_PORT="${freePort}"`);
+      expect(readFileSync(dockerLog, "utf8")).toContain(`DB_PORT=${freePort}`);
+    } finally {
+      await close(blocker);
+    }
+  });
+
+  it("uses a different Docker Compose project name for each manual worktree", () => {
+    const projectNames = new Set<string>();
+
+    for (const label of ["first", "second"]) {
+      const projectDir = mkdtempSync(join(tmpdir(), `worktree-up-${label}-`));
+      tempDirs.push(projectDir);
+      mkdirSync(join(projectDir, "scripts"));
+      mkdirSync(join(projectDir, "bin"));
+
+      writeFileSync(
+        join(projectDir, "scripts", "worktree-up.sh"),
+        readFileSync(join(import.meta.dirname, "worktree-up.sh"), "utf8")
+      );
+      chmodSync(join(projectDir, "scripts", "worktree-up.sh"), 0o755);
+
+      const dockerLog = join(projectDir, "docker.log");
+
+      writeExecutable(
+        join(projectDir, "bin", "docker"),
+        `#!/usr/bin/env bash
+echo "$COMPOSE_PROJECT_NAME" >> "${dockerLog}"
+exit 0
+`
+      );
+      writeExecutable(
+        join(projectDir, "bin", "npm"),
+        `#!/usr/bin/env bash
+exit 0
+`
+      );
+      writeExecutable(
+        join(projectDir, "bin", "openssl"),
+        `#!/usr/bin/env bash
+printf 'test-secret'
+`
+      );
+
+      const result = spawnSync("bash", ["scripts/worktree-up.sh"], {
+        cwd: projectDir,
+        encoding: "utf8",
+        env: {
+          ...envWithoutConductor(),
+          DB_PORT: label === "first" ? "5541" : "5542",
+          PATH: `${join(projectDir, "bin")}:${process.env.PATH ?? ""}`,
+        },
+      });
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      projectNames.add(readFileSync(dockerLog, "utf8").trim().split("\n")[0]);
+    }
+
+    expect(projectNames.size).toBe(2);
   });
 });

@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Resultat } from "./actions";
+import type { FreelanceCree, Resultat } from "./actions";
 
 type Freelance = {
   id: number;
@@ -26,11 +26,13 @@ export function FreelanceFormDialog({
   freelance,
   titre,
   trigger,
+  onCreated,
 }: {
   action: (formData: FormData) => Promise<Resultat>;
   freelance?: Freelance; // fourni = modification, sinon = création
   titre: string;
   trigger: React.ReactElement;
+  onCreated?: (freelance: FreelanceCree) => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -49,6 +51,9 @@ export function FreelanceFormDialog({
           action={async (formData) => {
             const res = await action(formData);
             if (res.ok) {
+              if (!freelance && "freelance" in res && res.freelance) {
+                onCreated?.(res.freelance);
+              }
               toast.success("Freelance enregistré.");
               setOpen(false);
             } else {

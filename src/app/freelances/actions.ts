@@ -7,7 +7,10 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/server";
 
-export type Resultat = { ok: boolean; message?: string };
+export type FreelanceCree = { id: number; prenom: string; nom: string };
+export type Resultat =
+  | { ok: false; message?: string }
+  | { ok: true; freelance?: FreelanceCree };
 
 async function verifierConnecte(): Promise<Resultat> {
   if (await getSession()) return { ok: true };
@@ -22,10 +25,16 @@ export async function creerFreelance(formData: FormData): Promise<Resultat> {
   const nom = String(formData.get("nom") ?? "").trim();
   if (!prenom || !nom) return { ok: false, message: "Le prénom et le nom sont obligatoires." };
 
-  await db.insert(freelances).values({ prenom, nom });
+  const [freelance] = await db
+    .insert(freelances)
+    .values({ prenom, nom })
+    .returning({ id: freelances.id, prenom: freelances.prenom, nom: freelances.nom });
 
   revalidatePath("/freelances");
-  return { ok: true };
+  revalidatePath("/missions");
+  revalidatePath("/projets");
+  revalidatePath("/");
+  return { ok: true, freelance };
 }
 
 export async function modifierFreelance(formData: FormData): Promise<Resultat> {

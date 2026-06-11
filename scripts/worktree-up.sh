@@ -14,9 +14,23 @@ cd "$(dirname "$0")/.."
 
 # --- Nom de projet Docker unique par workspace ---
 # Évite que deux workspaces partagent le même conteneur/volume.
-RAW_NAME="${CONDUCTOR_WORKSPACE_NAME:-suivi-marge}"
-# On nettoie le nom (minuscules, caractères autorisés uniquement).
-COMPOSE_PROJECT_NAME="$(printf '%s' "$RAW_NAME" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9_-')"
+slugify_compose_name() {
+  local raw="$1"
+  local slug
+  slug="$(printf '%s' "$raw" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9_-' | sed -E 's/^[^a-z0-9]+//; s/[^a-z0-9]+$//')"
+  printf '%s\n' "${slug:-suivi-marge}"
+}
+
+worktree_hash() {
+  if command -v shasum >/dev/null 2>&1; then
+    printf '%s' "$PWD" | shasum | awk '{ print substr($1, 1, 8) }'
+  else
+    printf '%s' "$PWD" | cksum | awk '{ print $1 }'
+  fi
+}
+
+RAW_NAME="${CONDUCTOR_WORKSPACE_NAME:-$(basename "$PWD")}"
+COMPOSE_PROJECT_NAME="$(slugify_compose_name "$RAW_NAME")-$(worktree_hash)"
 export COMPOSE_PROJECT_NAME
 
 # --- Ports ---
@@ -35,6 +49,9 @@ port_is_available_for_this_workspace() {
       if [[ "$container_name" == "${COMPOSE_PROJECT_NAME}-"* ]]; then
         return 0
       fi
+      if [[ "$container_name" == "${COMPOSE_PROJECT_NAME}_"* ]]; then
+        return 0
+      fi
     done <<< "$docker_names"
     return 1
   fi
@@ -43,13 +60,19 @@ port_is_available_for_this_workspace() {
 }
 
 select_db_port() {
-  if [ -z "${CONDUCTOR_PORT:-}" ]; then
-    printf '%s\n' "${DB_PORT:-5432}"
-    return 0
+  local first_port
+  local last_port
+
+  if [ -n "${CONDUCTOR_PORT:-}" ]; then
+    first_port=$((CONDUCTOR_PORT + 1))
+    last_port=$((CONDUCTOR_PORT + 9))
+  else
+    first_port="${DB_PORT:-5432}"
+    last_port=$((first_port + 9))
   fi
 
   local candidate
-  for candidate in $(seq $((CONDUCTOR_PORT + 1)) $((CONDUCTOR_PORT + 9))); do
+  for candidate in $(seq "$first_port" "$last_port"); do
     if port_is_available_for_this_workspace "$candidate"; then
       printf '%s\n' "$candidate"
       return 0
@@ -57,7 +80,7 @@ select_db_port() {
     echo "→ Port PostgreSQL ${candidate} déjà utilisé, essai du suivant..." >&2
   done
 
-  echo "❌ Aucun port PostgreSQL libre entre $((CONDUCTOR_PORT + 1)) et $((CONDUCTOR_PORT + 9))." >&2
+  echo "❌ Aucun port PostgreSQL libre entre ${first_port} et ${last_port}." >&2
   return 1
 }
 
@@ -67,7 +90,8 @@ export DB_PORT
 # --- Écrit DATABASE_URL dans .env (en conservant les autres lignes éventuelles) ---
 DB_URL="postgresql://postgres:postgres@localhost:${DB_PORT}/suivi_marge"
 touch .env
-grep -v '^DATABASE_URL=' .env > .env.tmp 2>/dev/null || true
+grep -v -E '^(DB_PORT|DATABASE_URL)=' .env > .env.tmp 2>/dev/null || true
+echo "DB_PORT=\"${DB_PORT}\"" >> .env.tmp
 echo "DATABASE_URL=\"${DB_URL}\"" >> .env.tmp
 mv .env.tmp .env
 echo "→ .env : DATABASE_URL pointe vers le port ${DB_PORT}"

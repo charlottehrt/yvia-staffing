@@ -16,6 +16,9 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { STATUTS_COMMERCIAUX } from "@/lib/projets/statut-commercial";
 import type { Resultat } from "./actions";
+import { ClientFormDialog } from "@/app/clients/client-form-dialog";
+import { creerClient } from "@/app/clients/actions";
+import { ajouterClientLocal } from "@/lib/entity-options";
 
 type OptionClient = { id: number; nom: string };
 
@@ -42,6 +45,9 @@ export function ProjetFormDialog({
   projet?: Projet;
 }) {
   const [open, setOpen] = useState(false);
+  const [clientsOptions, setClientsOptions] = useState(clientsListe);
+  const [clientId, setClientId] = useState(projet?.clientId ? String(projet.clientId) : "");
+
   const cle = projet
     ? `${projet.id}:${projet.nom}:${projet.budget}:${projet.clientId}:${projet.statutCommercial}:${projet.montantEnvisage ?? ""}`
     : "new";
@@ -76,14 +82,31 @@ export function ProjetFormDialog({
 
           <div className="space-y-2">
             <Label htmlFor="clientId">Client *</Label>
-            <Select
-              id="clientId"
-              name="clientId"
-              defaultValue={projet?.clientId ?? ""}
-              required
-              placeholder="Choisir un client"
-              options={clientsListe.map((c) => ({ value: c.id, label: c.nom }))}
-            />
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <Select
+                id="clientId"
+                name="clientId"
+                value={clientId}
+                onValueChange={setClientId}
+                required
+                placeholder="Choisir un client"
+                options={clientsOptions.map((c) => ({ value: c.id, label: c.nom }))}
+              />
+              <ClientFormDialog
+                action={creerClient}
+                titre="Nouveau client"
+                trigger={
+                  <Button type="button" variant="outline">
+                    Créer
+                  </Button>
+                }
+                onCreated={(client) => {
+                  const resultat = ajouterClientLocal(clientsOptions, client);
+                  setClientsOptions(resultat.options);
+                  setClientId(resultat.selectedId);
+                }}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

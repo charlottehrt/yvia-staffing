@@ -1,111 +1,112 @@
-// Seeder de SIMULATION : remplit la base avec un jeu de données de démonstration.
+// Seeder de SIMULATION : prépare un environnement complet de démonstration.
 // Usage : npm run seed:simulation
 //
 // Contenu :
-//   - 3 clients   : Wenimmo, APG, Delta
-//   - 3 freelances: Maxime, Alex, Paul
-//   - 6 missions  : chaque freelance travaille pour 2 clients, chaque client a 2 freelances
-//   - un planning jour par jour (affectations) sur mai -> juillet 2026, jours ouvrés
-//   - 2 projets forfait avec échéancier (recettes/coûts, réalisé + prévu) et fiabilités
+//   - 1 admin de test : admin@yvia.io / admin (surchargeable par env)
+//   - clients et freelances actifs + archivés
+//   - missions actives + inactive
+//   - planning régie du mois courant jusqu'à plusieurs mois futurs
+//   - projets forfaitaires réalisés, en cours et à venir
+//   - encaissements/décaissements réalisés et prévus pour tester Pilotage
 //
 // ATTENTION : ce script REMET À ZÉRO les données métier (clients, freelances,
-// missions, affectations, projets...). Il ne touche PAS aux comptes utilisateurs.
+// missions, affectations, projets...). Il préserve les autres comptes mais
+// crée/réinitialise le compte admin de démonstration.
 // À n'utiliser qu'en développement.
 
 import "dotenv/config";
+import { randomBytes, scryptSync } from "node:crypto";
 import { createSqlClient } from "./db-url.mjs";
+import { construireSimulation, joursOuvres } from "./seed-simulation-data.mjs";
 
 const sql = createSqlClient();
 
-// --- Jours fériés français à exclure (sous-ensemble couvrant mai-juillet 2026) ---
-const feries2026 = new Set([
-  "2026-05-01", // Fête du travail
-  "2026-05-08", // Victoire 1945
-  "2026-05-14", // Ascension
-  "2026-05-25", // Lundi de Pentecôte
-  "2026-07-14", // Fête nationale
-]);
+const emailAdmin = (process.env.SEED_ADMIN_EMAIL ?? "admin@yvia.io").toLowerCase();
+const motDePasseAdmin = process.env.SEED_ADMIN_PASSWORD ?? "admin";
+const nomAdmin = process.env.SEED_ADMIN_NOM ?? "Admin";
 
-// Liste des jours ouvrés (lun-ven, hors fériés) sur un intervalle inclusif.
-function joursOuvres(debutISO, finISO) {
-  const dates = [];
-  let courant = new Date(debutISO + "T00:00:00Z");
-  const fin = new Date(finISO + "T00:00:00Z");
-  while (courant.getTime() <= fin.getTime()) {
-    const jour = courant.getUTCDay(); // 0 = dimanche, 6 = samedi
-    const texte = courant.toISOString().slice(0, 10);
-    if (jour !== 0 && jour !== 6 && !feries2026.has(texte)) dates.push(texte);
-    courant = new Date(courant.getTime() + 24 * 60 * 60 * 1000);
-  }
-  return dates;
+// Même format que src/lib/auth/password.ts : "scrypt$<sel hex>$<hash hex>".
+function hasher(mdp) {
+  const sel = randomBytes(16);
+  const hash = scryptSync(mdp, sel, 64);
+  return `scrypt$${sel.toString("hex")}$${hash.toString("hex")}`;
+}
+
+function grouperPar(items, cle) {
+  const groupes = {};
+  for (const item of items) (groupes[item[cle]] ??= []).push(item);
+  return groupes;
 }
 
 try {
-  // 1) Remise à zéro des données métier (les utilisateurs sont préservés).
+  const simulation = construireSimulation(new Date());
+
+  // 1) Compte admin de démonstration.
+  await sql`
+    INSERT INTO users (email, password_hash, prenom, nom, actif, role)
+    VALUES (${emailAdmin}, ${hasher(motDePasseAdmin)}, ${null}, ${nomAdmin}, ${true}, ${"admin"})
+    ON CONFLICT (email) DO UPDATE
+      SET password_hash = EXCLUDED.password_hash,
+          prenom = EXCLUDED.prenom,
+          nom = EXCLUDED.nom,
+          actif = true,
+          role = 'admin'`;
+
+  // 2) Remise à zéro des données métier.
   await sql`TRUNCATE jalons, encaissements, decaissements, projets, affectations, missions, freelances, clients RESTART IDENTITY CASCADE`;
 
-  // 2) Clients, avec leur fiabilité de paiement par défaut (cf. prévisionnel) :
-  //    Wenimmo = bon payeur, APG = moyen, Delta = historiquement incertain.
-  const clients = await sql`
-    INSERT INTO clients (nom, fiabilite_defaut) VALUES
-      ('Wenimmo', 'securise'),
-      ('APG', 'probable'),
-      ('Delta', 'incertain')
-    RETURNING id, nom`;
+  // 3) Clients.
+  const clients = [];
+  for (const c of simulation.clients) {
+    const [row] = await sql`
+      INSERT INTO clients (nom, actif, fiabilite_defaut)
+      VALUES (${c.nom}, ${c.actif}, ${c.fiabiliteDefaut})
+      RETURNING id, nom`;
+    clients.push(row);
+  }
   const idClient = Object.fromEntries(clients.map((c) => [c.nom, c.id]));
 
-  // 3) Freelances (prénom + nom, le nom est obligatoire dans le schéma)
-  const freelances = await sql`
-    INSERT INTO freelances (prenom, nom) VALUES
-      ('Maxime', 'Dubois'),
-      ('Alex', 'Martin'),
-      ('Paul', 'Bernard')
-    RETURNING id, prenom`;
+  // 4) Freelances.
+  const freelances = [];
+  for (const f of simulation.freelances) {
+    const [row] = await sql`
+      INSERT INTO freelances (prenom, nom, actif)
+      VALUES (${f.prenom}, ${f.nom}, ${f.actif})
+      RETURNING id, prenom`;
+    freelances.push(row);
+  }
   const idFree = Object.fromEntries(freelances.map((f) => [f.prenom, f.id]));
 
-  // 4) Missions : on relie freelances et clients.
-  //    Chaque freelance a une mission "principale" et une "secondaire" chez un autre client.
-  const defsMissions = [
-    { free: "Maxime", client: "Wenimmo", nom: "Refonte site Wenimmo", achat: 450, vente: 700 },
-    { free: "Maxime", client: "APG", nom: "Support technique APG", achat: 450, vente: 680 },
-    { free: "Alex", client: "APG", nom: "App mobile APG", achat: 500, vente: 750 },
-    { free: "Alex", client: "Delta", nom: "Intégration Delta", achat: 500, vente: 720 },
-    { free: "Paul", client: "Delta", nom: "Plateforme data Delta", achat: 550, vente: 850 },
-    { free: "Paul", client: "Wenimmo", nom: "Audit performance Wenimmo", achat: 550, vente: 800 },
-  ];
-
+  // 5) Missions.
   const missionsCrees = [];
-  for (const m of defsMissions) {
+  for (const m of simulation.missions) {
     const [row] = await sql`
-      INSERT INTO missions (freelance_id, client_id, nom, tjm_achat, tjm_vente)
-      VALUES (${idFree[m.free]}, ${idClient[m.client]}, ${m.nom}, ${m.achat}, ${m.vente})
+      INSERT INTO missions (freelance_id, client_id, nom, tjm_achat, tjm_vente, actif)
+      VALUES (${idFree[m.free]}, ${idClient[m.client]}, ${m.nom}, ${m.achat}, ${m.vente}, ${m.actif})
       RETURNING id`;
     missionsCrees.push({ ...m, id: row.id });
   }
 
-  // Pour chaque freelance : [mission principale, mission secondaire]
-  const missionsParFree = {};
-  for (const m of missionsCrees) {
-    (missionsParFree[m.free] ??= []).push(m);
-  }
+  // 6) Planning régie : uniquement les freelances et missions actifs.
+  const missionsActivesParFree = grouperPar(
+    missionsCrees.filter((m) => m.actif),
+    "free"
+  );
+  const freelancesActifs = simulation.freelances.filter((f) => f.actif);
+  const jours = joursOuvres(simulation.planning.debut, simulation.planning.fin);
+  const lignesAffectations = [];
 
-  // 5) Planning jour par jour sur mai -> juillet 2026.
-  //    Règles (déterministes) pour un rendu réaliste :
-  //      - 1 jour sur 10 : freelance non affecté (congé / inter-contrat)
-  //      - 1 semaine sur 4 : il bascule sur sa mission secondaire
-  //      - le reste du temps : mission principale
-  //    Le TJM est figé (recopié de la mission) au moment où le jour est posé.
-  const jours = joursOuvres("2026-05-01", "2026-07-31");
-  const lignes = [];
-  for (const free of Object.keys(missionsParFree)) {
-    const [principale, secondaire] = missionsParFree[free];
+  for (const free of freelancesActifs) {
+    const missionsFree = missionsActivesParFree[free.prenom] ?? [];
+    if (missionsFree.length === 0) continue;
+
     jours.forEach((date, i) => {
-      if (i % 10 === 5) return; // jour off
+      if (i % 11 === 6) return; // respiration : inter-contrat / congé
       const semaine = Math.floor(i / 5);
-      const mission = semaine % 4 === 3 ? secondaire : principale;
-      lignes.push({
+      const mission = missionsFree[semaine % missionsFree.length];
+      lignesAffectations.push({
         missionId: mission.id,
-        freelanceId: idFree[free],
+        freelanceId: idFree[free.prenom],
         date,
         tjmAchat: mission.achat,
         tjmVente: mission.vente,
@@ -113,75 +114,31 @@ try {
     });
   }
 
-  for (const l of lignes) {
+  for (const l of lignesAffectations) {
     await sql`
       INSERT INTO affectations (mission_id, freelance_id, date, tjm_achat, tjm_vente)
       VALUES (${l.missionId}, ${l.freelanceId}, ${l.date}, ${l.tjmAchat}, ${l.tjmVente})`;
   }
 
-  // 6) Projets au FORFAIT, avec leur échéancier (recettes + coûts).
-  //    statut 'encaisse'/'decaisse' = réalisé (passé), 'prevu' = attendu (futur).
-  //    fiabilite sur une recette prévue = surcharge la cascade projet/client.
-  //    (Aujourd'hui de la simulation : 2026-06-10. Avant = réalisé, après = prévu.)
-  const projetsDef = [
-    {
-      client: "APG",
-      nom: "Site e-commerce APG (forfait)",
-      budget: 60000,
-      fiabiliteDefaut: null, // hérite d'APG (probable)
-      recettes: [
-        { date: "2026-05-15", montant: 20000, libelle: "Acompte 30%", statut: "encaisse", fiabilite: null },
-        { date: "2026-06-30", montant: 25000, libelle: "Jalon 2 - livraison V1", statut: "prevu", fiabilite: null },
-        { date: "2026-07-31", montant: 15000, libelle: "Solde", statut: "prevu", fiabilite: "incertain" },
-      ],
-      couts: [
-        { free: "Alex", date: "2026-05-20", montant: 8000, libelle: "Sprint 1", statut: "decaisse" },
-        { free: "Paul", date: "2026-06-10", montant: 6000, libelle: "Architecture", statut: "decaisse" },
-        { free: "Alex", date: "2026-06-25", montant: 9000, libelle: "Sprint 2", statut: "prevu" },
-        { free: "Maxime", date: "2026-07-15", montant: 5000, libelle: "Finitions", statut: "prevu" },
-      ],
-      jalons: [
-        { date: "2026-05-05", libelle: "Kickoff projet" },
-        { date: "2026-06-15", libelle: "Livraison V1" },
-        { date: "2026-07-20", libelle: "Recette client" },
-      ],
-    },
-    {
-      client: "Delta",
-      nom: "Refonte CRM Delta (forfait)",
-      budget: 40000,
-      fiabiliteDefaut: "probable", // surcharge : ce projet Delta est mieux sécurisé que d'habitude
-      recettes: [
-        { date: "2026-06-01", montant: 10000, libelle: "Acompte", statut: "encaisse", fiabilite: null },
-        { date: "2026-07-15", montant: 18000, libelle: "Jalon livraison", statut: "prevu", fiabilite: null },
-        { date: "2026-09-30", montant: 12000, libelle: "Solde", statut: "prevu", fiabilite: "arisque" },
-      ],
-      couts: [
-        { free: "Paul", date: "2026-06-05", montant: 7000, libelle: "Cadrage", statut: "decaisse" },
-        { free: "Alex", date: "2026-07-20", montant: 8000, libelle: "Développement", statut: "prevu" },
-      ],
-      jalons: [
-        { date: "2026-06-02", libelle: "Kickoff" },
-        { date: "2026-09-15", libelle: "Go-live" },
-      ],
-    },
-  ];
-
-  for (const p of projetsDef) {
+  // 7) Projets forfaitaires, recettes, coûts et jalons.
+  for (const p of simulation.projets) {
     const [projet] = await sql`
-      INSERT INTO projets (client_id, nom, budget, fiabilite_defaut)
-      VALUES (${idClient[p.client]}, ${p.nom}, ${p.budget}, ${p.fiabiliteDefaut})
+      INSERT INTO projets (client_id, nom, budget, actif, fiabilite_defaut)
+      VALUES (${idClient[p.client]}, ${p.nom}, ${p.budget}, ${p.actif}, ${p.fiabiliteDefaut})
       RETURNING id`;
+
     for (const r of p.recettes) {
       await sql`
         INSERT INTO encaissements (projet_id, date, montant, libelle, statut, fiabilite)
         VALUES (${projet.id}, ${r.date}, ${r.montant}, ${r.libelle}, ${r.statut}, ${r.fiabilite})`;
     }
+
     for (const c of p.couts) {
       await sql`
         INSERT INTO decaissements (projet_id, freelance_id, date, montant, libelle, statut)
         VALUES (${projet.id}, ${idFree[c.free]}, ${c.date}, ${c.montant}, ${c.libelle}, ${c.statut})`;
     }
+
     for (const j of p.jalons) {
       await sql`
         INSERT INTO jalons (projet_id, date, libelle)
@@ -189,22 +146,26 @@ try {
     }
   }
 
-  // Petit récap chiffré.
-  const nbRecettes = projetsDef.reduce((s, p) => s + p.recettes.length, 0);
-  const nbCouts = projetsDef.reduce((s, p) => s + p.couts.length, 0);
-  const nbJalons = projetsDef.reduce((s, p) => s + p.jalons.length, 0);
-  const recPrevues = projetsDef.flatMap((p) => p.recettes).filter((r) => r.statut === "prevu").length;
-  const coutsPrevus = projetsDef.flatMap((p) => p.couts).filter((c) => c.statut === "prevu").length;
+  const recettes = simulation.projets.flatMap((p) => p.recettes);
+  const couts = simulation.projets.flatMap((p) => p.couts);
+  const jalons = simulation.projets.flatMap((p) => p.jalons);
+  const recRealisees = recettes.filter((r) => r.statut === "encaisse").length;
+  const recPrevues = recettes.filter((r) => r.statut === "prevu").length;
+  const coutsRealises = couts.filter((c) => c.statut === "decaisse").length;
+  const coutsPrevus = couts.filter((c) => c.statut === "prevu").length;
 
-  console.log("Simulation chargée :");
-  console.log(`  Clients      : ${clients.length}`);
-  console.log(`  Freelances   : ${freelances.length}`);
-  console.log(`  Missions     : ${missionsCrees.length}`);
-  console.log(`  Affectations : ${lignes.length} (jours posés sur mai -> juillet 2026)`);
-  console.log(`  Projets forfait : ${projetsDef.length}`);
-  console.log(`    Recettes : ${nbRecettes} (dont ${recPrevues} prévues)`);
-  console.log(`    Coûts    : ${nbCouts} (dont ${coutsPrevus} prévus)`);
-  console.log(`    Jalons   : ${nbJalons}`);
+  console.log("Simulation complète chargée :");
+  console.log(`  Admin        : ${emailAdmin} / ${motDePasseAdmin}`);
+  console.log(`  Référence    : ${simulation.reference}`);
+  console.log(`  Clients      : ${clients.length} (${simulation.clients.filter((c) => !c.actif).length} archivé)`);
+  console.log(`  Freelances   : ${freelances.length} (${simulation.freelances.filter((f) => !f.actif).length} inactif)`);
+  console.log(`  Missions     : ${missionsCrees.length} (${simulation.missions.filter((m) => !m.actif).length} inactive)`);
+  console.log(`  Affectations : ${lignesAffectations.length} (${simulation.planning.debut} -> ${simulation.planning.fin})`);
+  console.log(`  Projets      : ${simulation.projets.length}`);
+  console.log(`    Recettes   : ${recettes.length} (${recRealisees} encaissées, ${recPrevues} prévues)`);
+  console.log(`    Coûts      : ${couts.length} (${coutsRealises} décaissés, ${coutsPrevus} prévus)`);
+  console.log(`    Jalons     : ${jalons.length}`);
+  console.log("Connecte-toi sur /login puis ouvre /statistiques.");
 } finally {
   await sql.end();
 }

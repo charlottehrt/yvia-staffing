@@ -3,6 +3,6 @@
 
 [scripts]
 archive = "./scripts/worktree-down.sh --purge"
-run = "npm run dev -- -p \"$CONDUCTOR_PORT\""
+run = "npm run dev"
 run_mode = "concurrent"
 setup = "./scripts/worktree-up.sh"

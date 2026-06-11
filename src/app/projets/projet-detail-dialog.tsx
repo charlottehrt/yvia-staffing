@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -19,6 +20,9 @@ import { modifierChampEntite } from "@/app/_drawer/actions";
 import { formatEuro, formatDate } from "@/lib/format";
 import { pourcentFiabilite } from "@/lib/calculs/previsionnel";
 import { STATUTS_COMMERCIAUX } from "@/lib/projets/statut-commercial";
+import { FreelanceFormDialog } from "@/app/freelances/freelance-form-dialog";
+import { creerFreelance } from "@/app/freelances/actions";
+import { ajouterFreelanceLocal } from "@/lib/entity-options";
 import {
   ajouterEncaissement,
   supprimerEncaissement,
@@ -74,6 +78,8 @@ export function ProjetDetailDialog({
 }) {
   const router = useRouter();
   const aujourdhui = new Date().toISOString().slice(0, 10);
+  const [freelancesOptions, setFreelancesOptions] = useState(freelancesActifs);
+  const [freelanceDecaissementId, setFreelanceDecaissementId] = useState("");
 
   async function sauverChamp(cle: string, valeur: string) {
     const res = await modifierChampEntite({ type: "projet", id: projet.id }, cle, valeur);
@@ -274,17 +280,34 @@ export function ProjetDetailDialog({
               <input type="hidden" name="projetId" value={projet.id} />
               <div className="space-y-1">
                 <Label htmlFor={`dec-freelance-${projet.id}`}>Freelance *</Label>
-                <Select
-                  id={`dec-freelance-${projet.id}`}
-                  name="freelanceId"
-                  required
-                  defaultValue=""
-                  placeholder="Choisir un freelance"
-                  options={freelancesActifs.map((f) => ({
-                    value: f.id,
-                    label: `${f.prenom} ${f.nom}`,
-                  }))}
-                />
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                  <Select
+                    id={`dec-freelance-${projet.id}`}
+                    name="freelanceId"
+                    required
+                    value={freelanceDecaissementId}
+                    onValueChange={setFreelanceDecaissementId}
+                    placeholder="Choisir un freelance"
+                    options={freelancesOptions.map((f) => ({
+                      value: f.id,
+                      label: `${f.prenom} ${f.nom}`,
+                    }))}
+                  />
+                  <FreelanceFormDialog
+                    action={creerFreelance}
+                    titre="Nouveau freelance"
+                    trigger={
+                      <Button type="button" variant="outline">
+                        Créer
+                      </Button>
+                    }
+                    onCreated={(freelance) => {
+                      const resultat = ajouterFreelanceLocal(freelancesOptions, freelance);
+                      setFreelancesOptions(resultat.options);
+                      setFreelanceDecaissementId(resultat.selectedId);
+                    }}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">

@@ -14,7 +14,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import type { Resultat } from "./actions";
+import type { MissionCree, Resultat } from "./actions";
+import { ClientFormDialog } from "@/app/clients/client-form-dialog";
+import { creerClient } from "@/app/clients/actions";
+import { FreelanceFormDialog } from "@/app/freelances/freelance-form-dialog";
+import { creerFreelance } from "@/app/freelances/actions";
+import { ajouterClientLocal, ajouterFreelanceLocal } from "@/lib/entity-options";
 
 type OptionFreelance = { id: number; prenom: string; nom: string };
 type OptionClient = { id: number; nom: string };
@@ -35,6 +40,9 @@ export function MissionFormDialog({
   freelancesActifs,
   clientsListe,
   mission,
+  onCreated,
+  freelanceIdInitial,
+  clientIdInitial,
 }: {
   action: (formData: FormData) => Promise<Resultat>;
   titre: string;
@@ -42,14 +50,17 @@ export function MissionFormDialog({
   freelancesActifs: OptionFreelance[];
   clientsListe: OptionClient[];
   mission?: Mission;
+  onCreated?: (mission: MissionCree) => void;
+  freelanceIdInitial?: number;
+  clientIdInitial?: number;
 }) {
   const [open, setOpen] = useState(false);
 
   // Clé qui change si les valeurs de la mission changent : force le remontage du
   // formulaire (réinitialisation propre) au lieu de muter un champ déjà initialisé.
   const cleMission = mission
-    ? `${mission.id}:${mission.nom}:${mission.tjmAchat}:${mission.tjmVente}`
-    : "new";
+    ? `${mission.id}:${mission.nom}:${mission.freelanceId}:${mission.clientId}:${mission.tjmAchat}:${mission.tjmVente}`
+    : `new:${freelanceIdInitial ?? ""}:${clientIdInitial ?? ""}`;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -65,6 +76,9 @@ export function MissionFormDialog({
           freelancesActifs={freelancesActifs}
           clientsListe={clientsListe}
           mission={mission}
+          onCreated={onCreated}
+          freelanceIdInitial={freelanceIdInitial}
+          clientIdInitial={clientIdInitial}
           onSucces={() => {
             toast.success("Mission enregistrée.");
             setOpen(false);
@@ -80,17 +94,31 @@ function FormulaireMission({
   freelancesActifs,
   clientsListe,
   mission,
+  onCreated,
+  freelanceIdInitial,
+  clientIdInitial,
   onSucces,
 }: {
   action: (formData: FormData) => Promise<Resultat>;
   freelancesActifs: OptionFreelance[];
   clientsListe: OptionClient[];
   mission?: Mission;
+  onCreated?: (mission: MissionCree) => void;
+  freelanceIdInitial?: number;
+  clientIdInitial?: number;
   onSucces: () => void;
 }) {
   // TJM contrôlés pour pouvoir détecter une modification et proposer la propagation.
   const [tjmAchat, setTjmAchat] = useState(mission?.tjmAchat ?? "");
   const [tjmVente, setTjmVente] = useState(mission?.tjmVente ?? "");
+  const [freelancesOptions, setFreelancesOptions] = useState(freelancesActifs);
+  const [clientsOptions, setClientsOptions] = useState(clientsListe);
+  const freelanceInitial = mission?.freelanceId ?? freelanceIdInitial;
+  const clientInitial = mission?.clientId ?? clientIdInitial;
+  const [freelanceId, setFreelanceId] = useState(
+    freelanceInitial ? String(freelanceInitial) : ""
+  );
+  const [clientId, setClientId] = useState(clientInitial ? String(clientInitial) : "");
 
   // On ne propose la propagation qu'en modification, et seulement si un TJM a changé.
   const tjmModifie =
@@ -103,6 +131,7 @@ function FormulaireMission({
       action={async (formData) => {
         const res = await action(formData);
         if (res.ok) {
+          if (!mission && "mission" in res && res.mission) onCreated?.(res.mission);
           onSucces();
         } else {
           toast.error(res.message ?? "Une erreur est survenue.");
@@ -119,29 +148,63 @@ function FormulaireMission({
 
       <div className="space-y-2">
         <Label htmlFor="freelanceId">Freelance *</Label>
-        <Select
-          id="freelanceId"
-          name="freelanceId"
-          defaultValue={mission?.freelanceId ?? ""}
-          required
-          placeholder="Choisir un freelance"
-          options={freelancesActifs.map((f) => ({
-            value: f.id,
-            label: `${f.prenom} ${f.nom}`,
-          }))}
-        />
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <Select
+            id="freelanceId"
+            name="freelanceId"
+            value={freelanceId}
+            onValueChange={setFreelanceId}
+            required
+            placeholder="Choisir un freelance"
+            options={freelancesOptions.map((f) => ({
+              value: f.id,
+              label: `${f.prenom} ${f.nom}`,
+            }))}
+          />
+          <FreelanceFormDialog
+            action={creerFreelance}
+            titre="Nouveau freelance"
+            trigger={
+              <Button type="button" variant="outline">
+                Créer
+              </Button>
+            }
+            onCreated={(freelance) => {
+              const resultat = ajouterFreelanceLocal(freelancesOptions, freelance);
+              setFreelancesOptions(resultat.options);
+              setFreelanceId(resultat.selectedId);
+            }}
+          />
+        </div>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="clientId">Client *</Label>
-        <Select
-          id="clientId"
-          name="clientId"
-          defaultValue={mission?.clientId ?? ""}
-          required
-          placeholder="Choisir un client"
-          options={clientsListe.map((c) => ({ value: c.id, label: c.nom }))}
-        />
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <Select
+            id="clientId"
+            name="clientId"
+            value={clientId}
+            onValueChange={setClientId}
+            required
+            placeholder="Choisir un client"
+            options={clientsOptions.map((c) => ({ value: c.id, label: c.nom }))}
+          />
+          <ClientFormDialog
+            action={creerClient}
+            titre="Nouveau client"
+            trigger={
+              <Button type="button" variant="outline">
+                Créer
+              </Button>
+            }
+            onCreated={(client) => {
+              const resultat = ajouterClientLocal(clientsOptions, client);
+              setClientsOptions(resultat.options);
+              setClientId(resultat.selectedId);
+            }}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

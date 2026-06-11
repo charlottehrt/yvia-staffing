@@ -2,12 +2,21 @@
 // Le middleware ne protège PAS les Server Actions : chaque mutation vérifie la session.
 
 import { db } from "@/db";
-import { missions, affectations } from "@/db/schema";
+import { missions, affectations, clients } from "@/db/schema";
 import { and, eq, gte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/server";
 
-export type Resultat = { ok: boolean; message?: string };
+export type MissionCree = {
+  id: number;
+  freelanceId: number;
+  clientId: number;
+  nom: string;
+  clientNom: string;
+  tjmAchat: string;
+  tjmVente: string;
+};
+export type Resultat = { ok: false; message?: string } | { ok: true; mission?: MissionCree };
 
 type ValeursMission = {
   freelanceId: number;
@@ -51,10 +60,22 @@ export async function creerMission(formData: FormData): Promise<Resultat> {
   const champs = lireChampsMission(formData);
   if (!champs.ok) return { ok: false, message: champs.erreur };
 
-  await db.insert(missions).values(champs.valeurs);
+  const [mission] = await db.insert(missions).values(champs.valeurs).returning({
+    id: missions.id,
+    freelanceId: missions.freelanceId,
+    clientId: missions.clientId,
+    nom: missions.nom,
+    tjmAchat: missions.tjmAchat,
+    tjmVente: missions.tjmVente,
+  });
+  const [client] = await db
+    .select({ nom: clients.nom })
+    .from(clients)
+    .where(eq(clients.id, mission.clientId));
 
   revalidatePath("/missions");
-  return { ok: true };
+  revalidatePath("/");
+  return { ok: true, mission: { ...mission, clientNom: client?.nom ?? "" } };
 }
 
 export async function modifierMission(formData: FormData): Promise<Resultat> {

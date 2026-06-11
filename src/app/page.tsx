@@ -91,6 +91,7 @@ export default async function PagePlanning({
   // Données.
   const [
     freelancesActifs,
+    clientsActifs,
     missionsDispo,
     affs,
     projetsActifs,
@@ -103,6 +104,11 @@ export default async function PagePlanning({
       .from(freelances)
       .where(eq(freelances.actif, true))
       .orderBy(freelances.nom),
+    db
+      .select({ id: clients.id, nom: clients.nom })
+      .from(clients)
+      .where(eq(clients.actif, true))
+      .orderBy(clients.nom),
     db
       .select({
         id: missions.id,
@@ -486,6 +492,7 @@ export default async function PagePlanning({
             lignes={lignes}
             projets={projetsLignes}
             freelancesActifs={freelancesActifs}
+            clientsActifs={clientsActifs}
           />
         </>
       )}
