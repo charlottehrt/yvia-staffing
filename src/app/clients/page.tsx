@@ -6,6 +6,7 @@ import { exigerSession } from "@/lib/auth/server";
 import { clients } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
+import { ListViewToolbar } from "@/components/list-view-toolbar";
 import {
   Card,
   CardContent,
@@ -42,15 +43,15 @@ export default async function PageClients({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
-        <ClientFormDialog
-          action={creerClient}
-          titre="Nouveau client"
-          trigger={<Button>Nouveau client</Button>}
-        />
-      </div>
-
-      <div className="flex gap-1">
+      <ListViewToolbar
+        action={
+          <ClientFormDialog
+            action={creerClient}
+            titre="Nouveau client"
+            trigger={<Button>Nouveau client</Button>}
+          />
+        }
+      >
         <Link
           href="/clients"
           className={`rounded-md px-3 py-1.5 text-sm ${
@@ -67,7 +68,7 @@ export default async function PageClients({
         >
           Archives
         </Link>
-      </div>
+      </ListViewToolbar>
 
       <Card>
         <CardHeader>
