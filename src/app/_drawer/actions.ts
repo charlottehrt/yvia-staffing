@@ -184,8 +184,9 @@ async function chargerClient(id: number): Promise<DetailEntite | null> {
         vide: "Aucune mission chez ce client.",
         liens: missionsRows.map((m) => ({
           ref: { type: "mission", id: m.id },
-          label: m.actif ? m.nom : `${m.nom} (inactive)`,
+          label: m.nom,
           sous: `${m.freelancePrenom} ${m.freelanceNom}`,
+          statut: { actif: m.actif, label: m.actif ? "Active" : "Inactive" },
         })),
       },
       {

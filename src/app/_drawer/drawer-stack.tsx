@@ -15,9 +15,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 import { chargerEntite, basculerActif, modifierChampEntite } from "./actions";
 import { ChampInline } from "./champ-inline";
-import { LIBELLE_TYPE, type DetailEntite, type EntiteRef } from "./types";
+import { LIBELLE_TYPE, type DetailEntite, type EntiteRef, type Lien } from "./types";
 
 type DrawerContexte = {
   ouvrir: (ref: EntiteRef) => void;
@@ -171,18 +172,11 @@ function DrawerContenu({
               ) : (
                 <div className="divide-y rounded-lg border border-border">
                   {section.liens.map((lien) => (
-                    <button
+                    <LienEntiteButton
                       key={`${lien.ref.type}-${lien.ref.id}`}
-                      onClick={() => onOuvrir(lien.ref)}
-                      className="group flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted"
-                    >
-                      <span className="font-medium text-primary group-hover:underline">
-                        {lien.label}
-                      </span>
-                      {lien.sous ? (
-                        <span className="text-xs text-muted-foreground">{lien.sous}</span>
-                      ) : null}
-                    </button>
+                      lien={lien}
+                      onOuvrir={onOuvrir}
+                    />
                   ))}
                 </div>
               )}
@@ -204,6 +198,64 @@ function DrawerContenu({
         </SheetFooter>
       ) : null}
     </SheetContent>
+  );
+}
+
+export function LienEntiteButton({
+  lien,
+  onOuvrir,
+}: {
+  lien: Lien;
+  onOuvrir: (ref: EntiteRef) => void;
+}) {
+  const estInactif = lien.statut?.actif === false;
+
+  if (!lien.statut) {
+    return (
+      <button
+        onClick={() => onOuvrir(lien.ref)}
+        className="group flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted"
+      >
+        <span className="font-medium text-primary group-hover:underline">{lien.label}</span>
+        {lien.sous ? (
+          <span className="text-xs text-muted-foreground">{lien.sous}</span>
+        ) : null}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => onOuvrir(lien.ref)}
+      className={cn(
+        "group flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-muted",
+        estInactif && "bg-muted/40 text-muted-foreground"
+      )}
+    >
+      <span className="min-w-0 flex-1">
+        <span
+          className={cn(
+            "block truncate font-medium text-primary group-hover:underline",
+            estInactif && "text-muted-foreground"
+          )}
+        >
+          {lien.label}
+        </span>
+        {lien.sous ? (
+          <span className="block truncate text-xs text-muted-foreground">{lien.sous}</span>
+        ) : null}
+      </span>
+      <span
+        className={cn(
+          "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium leading-5",
+          lien.statut.actif
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : "border-border bg-muted text-muted-foreground"
+        )}
+      >
+        {lien.statut.label}
+      </span>
+    </button>
   );
 }
 

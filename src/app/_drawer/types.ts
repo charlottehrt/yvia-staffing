@@ -11,7 +11,12 @@ export type EntiteRef = { type: TypeEntite; id: number };
 export type Info = { label: string; valeur: string };
 
 // Un lien vers une autre entité (cliquable, ouvre un niveau de drawer).
-export type Lien = { ref: EntiteRef; label: string; sous?: string };
+export type Lien = {
+  ref: EntiteRef;
+  label: string;
+  sous?: string;
+  statut?: { actif: boolean; label: string };
+};
 
 // Une section listant des entités liées.
 export type SectionLiens = { titre: string; liens: Lien[]; vide: string };
