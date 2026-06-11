@@ -5,7 +5,12 @@
 import { useState } from "react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { formatEuro } from "@/lib/format";
-import { labelStatutCommercial } from "@/lib/projets/statut-commercial";
+import { cn } from "@/lib/utils";
+import {
+  labelStatutCommercial,
+  normaliserStatutCommercial,
+  type StatutCommercialProjet,
+} from "@/lib/projets/statut-commercial";
 import { EntityLink } from "@/app/_drawer/drawer-stack";
 import { ProjetDetailDialog } from "./projet-detail-dialog";
 
@@ -32,6 +37,14 @@ type Projet = {
   actif: boolean;
 };
 
+const STATUT_COMMERCIAL_BADGE_CLASSES: Record<StatutCommercialProjet, string> = {
+  a_qualifier: "border-yvia-line-strong bg-yvia-ice text-yvia-slate",
+  en_discussion: "border-amber-200 bg-amber-50 text-amber-700",
+  proposition_envoyee: "border-sky-200 bg-sky-50 text-sky-700",
+  gagne: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  perdu: "border-rose-200 bg-rose-50 text-rose-700",
+};
+
 export function ProjetRow({
   projet,
   encaissements,
@@ -55,6 +68,7 @@ export function ProjetRow({
   const totalDec = somme(decaissements);
   const marge = totalEnc - totalDec;
   const reste = Number(projet.budget) - totalEnc;
+  const statutCommercial = normaliserStatutCommercial(projet.statutCommercial);
 
   return (
     <>
@@ -65,7 +79,16 @@ export function ProjetRow({
             {projet.clientNom}
           </EntityLink>
         </TableCell>
-        <TableCell>{labelStatutCommercial(projet.statutCommercial)}</TableCell>
+        <TableCell>
+          <span
+            className={cn(
+              "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium leading-5",
+              STATUT_COMMERCIAL_BADGE_CLASSES[statutCommercial]
+            )}
+          >
+            {labelStatutCommercial(statutCommercial)}
+          </span>
+        </TableCell>
         <TableCell className="text-right">{formatEuro(Number(projet.budget))}</TableCell>
         <TableCell className="text-right">{formatEuro(totalEnc)}</TableCell>
         <TableCell className="text-right">{formatEuro(totalDec)}</TableCell>
