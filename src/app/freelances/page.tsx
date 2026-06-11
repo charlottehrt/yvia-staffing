@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
+import { exigerSession } from "@/lib/auth/server";
 import { freelances, affectations } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { getSession } from "@/lib/auth/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -22,20 +21,16 @@ export default async function PageFreelances({
 }: {
   searchParams: Promise<{ vue?: string }>;
 }) {
-  if (!(await getSession())) redirect("/login");
-
+  await exigerSession();
   const { vue } = await searchParams;
   const archives = vue === "archives";
 
-  // Actifs par défaut ; archivés dans l'onglet Archives.
   const liste = await db
     .select()
     .from(freelances)
     .where(eq(freelances.actif, !archives))
     .orderBy(freelances.nom);
 
-  // Gain rapporté par freelance = marge cumulée des jours posés en régie
-  // (TJM vente - TJM achat, figés à la pose).
   const affs = await db
     .select({
       freelanceId: affectations.freelanceId,
@@ -59,7 +54,6 @@ export default async function PageFreelances({
         />
       </div>
 
-      {/* Onglets Actifs / Archives */}
       <div className="flex gap-1">
         <Link
           href="/freelances"

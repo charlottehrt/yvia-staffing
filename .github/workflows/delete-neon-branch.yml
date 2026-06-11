@@ -1,0 +1,85 @@
+name: Delete Neon branch
+
+on:
+  delete:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: read
+
+jobs:
+  delete-neon-branch:
+    name: Delete matching Neon branch
+    runs-on: ubuntu-latest
+    if: >
+      (github.event_name == 'delete' && github.event.ref_type == 'branch') ||
+      (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository)
+
+    env:
+      DELETED_REF: ${{ github.event.ref }}
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+      NEONCTL_VERSION: 2.24.2
+      PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+
+    steps:
+      - name: Delete matching Neon branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          branch_name="${DELETED_REF:-$PR_HEAD_REF}"
+
+          if [ -z "$branch_name" ]; then
+            echo "No branch name found for this event."
+            exit 0
+          fi
+
+          case "$branch_name" in
+            main|master|develop|development|staging|production)
+              echo "Skipping protected branch name: $branch_name"
+              exit 0
+              ;;
+          esac
+
+          if [ -z "${NEON_API_KEY:-}" ]; then
+            echo "NEON_API_KEY secret is not configured."
+            exit 1
+          fi
+
+          if [ -z "${NEON_PROJECT_ID:-}" ]; then
+            echo "NEON_PROJECT_ID variable is not configured."
+            exit 1
+          fi
+
+          branches_json="$(npx --yes "neonctl@${NEONCTL_VERSION}" branches list \
+            --project-id "$NEON_PROJECT_ID" \
+            --api-key "$NEON_API_KEY" \
+            --output json \
+            --no-analytics \
+            --color false)"
+
+          branch_id="$(jq -r --arg name "$branch_name" '
+            .[]
+            | select(.name == $name)
+            | select(.default != true)
+            | select(.protected != true)
+            | .id
+          ' <<< "$branches_json" | head -n 1)"
+
+          if [ -z "$branch_id" ]; then
+            echo "No matching non-default Neon branch found for: $branch_name"
+            exit 0
+          fi
+
+          npx --yes "neonctl@${NEONCTL_VERSION}" branches delete "$branch_id" \
+            --project-id "$NEON_PROJECT_ID" \
+            --api-key "$NEON_API_KEY" \
+            --output json \
+            --no-analytics \
+            --color false
+
+          echo "Deleted Neon branch $branch_id for Git branch: $branch_name"

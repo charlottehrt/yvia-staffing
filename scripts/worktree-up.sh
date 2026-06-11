@@ -12,24 +12,57 @@ set -euo pipefail
 # Se placer à la racine du projet, quel que soit l'endroit d'où on lance le script.
 cd "$(dirname "$0")/.."
 
-# --- Ports ---
-# Conductor réserve 10 ports par workspace, à partir de CONDUCTOR_PORT.
-# On garde CONDUCTOR_PORT pour l'application et CONDUCTOR_PORT+1 pour la base.
-# Hors Conductor (lancement manuel), on retombe sur les ports par défaut.
-APP_PORT="${CONDUCTOR_PORT:-3000}"
-if [ -n "${CONDUCTOR_PORT:-}" ]; then
-  DB_PORT=$((CONDUCTOR_PORT + 1))
-else
-  DB_PORT=5432
-fi
-export DB_PORT
-
 # --- Nom de projet Docker unique par workspace ---
 # Évite que deux workspaces partagent le même conteneur/volume.
 RAW_NAME="${CONDUCTOR_WORKSPACE_NAME:-suivi-marge}"
 # On nettoie le nom (minuscules, caractères autorisés uniquement).
 COMPOSE_PROJECT_NAME="$(printf '%s' "$RAW_NAME" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9_-')"
 export COMPOSE_PROJECT_NAME
+
+# --- Ports ---
+# Conductor réserve 10 ports par workspace, à partir de CONDUCTOR_PORT.
+# On garde CONDUCTOR_PORT pour l'application et un des ports suivants pour la base.
+# Hors Conductor (lancement manuel), on retombe sur les ports par défaut.
+APP_PORT="${CONDUCTOR_PORT:-3000}"
+
+port_is_available_for_this_workspace() {
+  local port="$1"
+  local docker_names
+
+  docker_names="$(docker ps --filter "publish=${port}" --format '{{.Names}}' 2>/dev/null || true)"
+  if [ -n "$docker_names" ]; then
+    while IFS= read -r container_name; do
+      if [[ "$container_name" == "${COMPOSE_PROJECT_NAME}-"* ]]; then
+        return 0
+      fi
+    done <<< "$docker_names"
+    return 1
+  fi
+
+  ! lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
+}
+
+select_db_port() {
+  if [ -z "${CONDUCTOR_PORT:-}" ]; then
+    printf '%s\n' "${DB_PORT:-5432}"
+    return 0
+  fi
+
+  local candidate
+  for candidate in $(seq $((CONDUCTOR_PORT + 1)) $((CONDUCTOR_PORT + 9))); do
+    if port_is_available_for_this_workspace "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+    echo "→ Port PostgreSQL ${candidate} déjà utilisé, essai du suivant..." >&2
+  done
+
+  echo "❌ Aucun port PostgreSQL libre entre $((CONDUCTOR_PORT + 1)) et $((CONDUCTOR_PORT + 9))." >&2
+  return 1
+}
+
+DB_PORT="$(select_db_port)"
+export DB_PORT
 
 # --- Écrit DATABASE_URL dans .env (en conservant les autres lignes éventuelles) ---
 DB_URL="postgresql://postgres:postgres@localhost:${DB_PORT}/suivi_marge"
@@ -69,5 +102,11 @@ npm install
 
 echo "→ Création / mise à jour des tables..."
 npm run db:push
+
+# Compte admin de démonstration (admin@yvia.io / admin). Upsert idempotent :
+# relancer le setup ne casse rien. Le seeder de simulation (seed:simulation)
+# reste manuel, lui REMET À ZÉRO les données métier.
+echo "→ Création du compte admin de démonstration..."
+npm run seed
 
 echo "✅ Environnement prêt. L'application tournera sur le port ${APP_PORT}."

@@ -1,18 +1,29 @@
 // Jeton de session signé (HMAC-SHA256) via la Web Crypto API, donc utilisable
-// à la fois côté serveur (Node) et dans le middleware (edge). N'importe rien de
-// spécifique à Node ni à next/headers pour rester compatible edge.
+// à la fois côté serveur (Node) et dans le proxy Next.js. N'importe rien de
+// spécifique à Node ni à next/headers pour rester réutilisable.
 
 export const SESSION_COOKIE = "yvia_session";
 export const DUREE_SESSION_MS = 30 * 24 * 60 * 60 * 1000; // 30 jours
 
 export type Role = "admin" | "user";
-export type Session = { userId: number; email: string; exp: number; role: Role };
+
+// pv = « password version » : ancre de révocation dérivée du hash du mot de
+// passe courant. Quand le mot de passe change, les jetons émis avant deviennent
+// invalides côté getSession().
+export type Session = { userId: number; email: string; exp: number; pv: string; role: Role };
 
 export function estAdmin(session: Session | null | undefined): boolean {
   return session?.role === "admin";
 }
 
 const TEXT = new TextEncoder();
+
+// Empreinte courte et stable du hash du mot de passe, embarquée dans le jeton.
+// Web Crypto uniquement, donc utilisable côté edge (proxy) comme côté Node.
+export async function pvDepuisHash(passwordHash: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", TEXT.encode(passwordHash));
+  return b64urlFromBytes(new Uint8Array(digest)).slice(0, 16);
+}
 
 function secret(): string {
   const s = process.env.SESSION_SECRET;
@@ -72,6 +83,7 @@ export async function verifierSession(token: string | undefined | null): Promise
     const session = JSON.parse(stringFromB64url(payload)) as Session;
     if (typeof session.exp !== "number" || session.exp < Date.now()) return null;
     if (typeof session.userId !== "number") return null;
+    if (typeof session.pv !== "string" || session.pv === "") return null;
     if (session.role !== "admin" && session.role !== "user") return null;
     return session;
   } catch {

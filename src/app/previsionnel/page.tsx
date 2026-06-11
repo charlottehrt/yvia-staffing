@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
   affectations,
@@ -26,7 +25,7 @@ import { fractionFiabilite } from "@/lib/calculs/previsionnel";
 import { PERIODES } from "@/app/statistiques/stats-config";
 import { StatsFiltres } from "@/app/statistiques/stats-filtres";
 import { StatsFiltreDrawer } from "@/app/statistiques/stats-filtre-drawer";
-import { getSession } from "@/lib/auth/server";
+import { exigerSession } from "@/lib/auth/server";
 
 const arrondi = (n: number) => Math.round(n * 100) / 100;
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -54,7 +53,7 @@ export default async function PagePrevisionnel({
     missions?: string;
   }>;
 }) {
-  if (!(await getSession())) redirect("/login");
+  await exigerSession();
 
   const params = await searchParams;
   const maintenant = new Date();

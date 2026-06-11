@@ -5,10 +5,10 @@
 // À utiliser uniquement en développement (mot de passe volontairement simple).
 
 import "dotenv/config";
-import postgres from "postgres";
 import { scryptSync, randomBytes } from "node:crypto";
+import { createSqlClient } from "./db-url.mjs";
 
-const email = (process.env.SEED_ADMIN_EMAIL ?? "admin@yvia.fr").toLowerCase();
+const email = (process.env.SEED_ADMIN_EMAIL ?? "admin@yvia.io").toLowerCase();
 const motDePasse = process.env.SEED_ADMIN_PASSWORD ?? "admin";
 const nom = process.env.SEED_ADMIN_NOM ?? "Admin";
 
@@ -19,7 +19,7 @@ function hasher(mdp) {
   return `scrypt$${sel.toString("hex")}$${hash.toString("hex")}`;
 }
 
-const sql = postgres(process.env.DATABASE_URL);
+const sql = createSqlClient();
 try {
   await sql`
     INSERT INTO users (email, password_hash, nom)

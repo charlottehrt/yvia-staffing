@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/db";
 import {
@@ -30,7 +29,7 @@ import { formatEuro, formatPourcent, formatJours, formatMois } from "@/lib/forma
 import { PlanningCalendar, type Couleur, type LigneFreelance, type Jour } from "./planning-calendar";
 import { EtendreMoisButton } from "./etendre-mois-button";
 import { EntityLink } from "./_drawer/drawer-stack";
-import { getSession } from "@/lib/auth/server";
+import { exigerSession } from "@/lib/auth/server";
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 const moisSuivant = (a: number, m: number) =>
@@ -59,7 +58,7 @@ export default async function PagePlanning({
 }: {
   searchParams: Promise<{ annee?: string; mois?: string }>;
 }) {
-  if (!(await getSession())) redirect("/login");
+  await exigerSession();
 
   const params = await searchParams;
   const maintenant = new Date();

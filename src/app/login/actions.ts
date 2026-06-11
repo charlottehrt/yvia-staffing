@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { verifierMotDePasse } from "@/lib/auth/password";
-import { signerSession, SESSION_COOKIE, DUREE_SESSION_MS } from "@/lib/auth/session";
+import { signerSession, pvDepuisHash, SESSION_COOKIE, DUREE_SESSION_MS } from "@/lib/auth/session";
 import { reinitialiserLimite, verifierLimite } from "@/lib/auth/rate-limit";
 
 export type Resultat = { ok: boolean; message?: string };
@@ -28,8 +28,9 @@ export async function connexion(formData: FormData): Promise<Resultat> {
   }
 
   const exp = Date.now() + DUREE_SESSION_MS;
+  const pv = await pvDepuisHash(u.passwordHash);
   const role = u.role === "user" ? "user" : "admin";
-  const token = await signerSession({ userId: u.id, email: u.email, exp, role });
+  const token = await signerSession({ userId: u.id, email: u.email, exp, pv, role });
   await reinitialiserLimite("login", email);
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,

@@ -1,0 +1,4 @@
+.context
+.env
+.env.*
+!.env.example

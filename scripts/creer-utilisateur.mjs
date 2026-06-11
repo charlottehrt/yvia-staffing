@@ -3,8 +3,8 @@
 // Pas d'inscription publique : c'est le seul moyen de créer un accès.
 
 import "dotenv/config";
-import postgres from "postgres";
 import { scryptSync, randomBytes } from "node:crypto";
+import { createSqlClient } from "./db-url.mjs";
 
 const [email, motDePasse, nom] = process.argv.slice(2);
 
@@ -19,7 +19,7 @@ function hasher(mdp) {
   return `scrypt$${sel.toString("hex")}$${hash.toString("hex")}`;
 }
 
-const sql = postgres(process.env.DATABASE_URL);
+const sql = createSqlClient();
 try {
   await sql`
     INSERT INTO users (email, password_hash, nom)

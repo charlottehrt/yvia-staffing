@@ -1,4 +1,5 @@
 "use server";
+// Le middleware ne protège PAS les Server Actions : chaque mutation vérifie la session.
 
 import { db } from "@/db";
 import { affectations, missions } from "@/db/schema";

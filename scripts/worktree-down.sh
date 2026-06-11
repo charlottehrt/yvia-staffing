@@ -6,7 +6,9 @@
 #
 # Option : --purge pour TOUT supprimer, y compris les données.
 #
-# Utilisable seul (./scripts/worktree-down.sh) ou via Conductor (script "archive").
+# Utilisable seul (./scripts/worktree-down.sh) ou via Conductor, qui archive
+# avec --purge : le worktree disparaissant définitivement, garder le volume
+# ne ferait qu'accumuler des données orphelines.
 
 set -euo pipefail
 

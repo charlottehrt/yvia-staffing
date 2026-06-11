@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
+import { exigerSession } from "@/lib/auth/server";
 import { missions, freelances, clients } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { getSession } from "@/lib/auth/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -27,11 +26,9 @@ export default async function PageMissions({
 }: {
   searchParams: Promise<{ statut?: string }>;
 }) {
-  if (!(await getSession())) redirect("/login");
-
+  await exigerSession();
   const { statut: filtreActif = "actives" } = await searchParams;
 
-  // Missions + noms du freelance et du client.
   const missionsRows = await db
     .select({
       id: missions.id,
@@ -50,44 +47,33 @@ export default async function PageMissions({
     .innerJoin(clients, eq(missions.clientId, clients.id))
     .orderBy(missions.id);
 
-  // Listes pour les menus déroulants du formulaire.
   const freelancesActifs = await db
     .select({ id: freelances.id, prenom: freelances.prenom, nom: freelances.nom })
     .from(freelances)
     .where(eq(freelances.actif, true))
     .orderBy(freelances.nom);
-  const clientsListe = await db
+
+  const clientsActifs = await db
     .select({ id: clients.id, nom: clients.nom })
     .from(clients)
     .where(eq(clients.actif, true))
     .orderBy(clients.nom);
 
-  const lignesAffichees =
-    filtreActif === "inactives"
-      ? missionsRows.filter((l) => !l.actif)
-      : missionsRows.filter((l) => l.actif);
-
-  const peutCreer = freelancesActifs.length > 0 && clientsListe.length > 0;
+  const actives = filtreActif !== "inactives";
+  const liste = missionsRows.filter((m) => m.actif === actives);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end">
-        {peutCreer ? (
-          <MissionFormDialog
-            action={creerMission}
-            titre="Nouvelle mission"
-            freelancesActifs={freelancesActifs}
-            clientsListe={clientsListe}
-            trigger={<Button>Nouvelle mission</Button>}
-          />
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Ajoutez d’abord au moins un freelance et un client.
-          </p>
-        )}
+        <MissionFormDialog
+          action={creerMission}
+          titre="Nouvelle mission"
+          freelancesActifs={freelancesActifs}
+          clientsListe={clientsActifs}
+          trigger={<Button>Nouvelle mission</Button>}
+        />
       </div>
 
-      {/* Filtres */}
       <div className="flex gap-1">
         {filtres.map((f) => (
           <Link
@@ -107,12 +93,15 @@ export default async function PageMissions({
       <Card>
         <CardHeader>
           <CardTitle>
-            {lignesAffichees.length} mission{lignesAffichees.length > 1 ? "s" : ""}
+            {liste.length} mission{liste.length > 1 ? "s" : ""}
+            {!actives ? " inactive" + (liste.length > 1 ? "s" : "") : ""}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {lignesAffichees.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucune mission à afficher.</p>
+          {liste.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {actives ? "Aucune mission active." : "Aucune mission inactive."}
+            </p>
           ) : (
             <Table>
               <TableHeader>
@@ -122,27 +111,12 @@ export default async function PageMissions({
                   <TableHead>Client</TableHead>
                   <TableHead className="text-right">TJM achat</TableHead>
                   <TableHead className="text-right">TJM vente</TableHead>
-                  <TableHead className="text-right">Marge/jour</TableHead>
-                  <TableHead>Statut</TableHead>
+                  <TableHead className="text-right">Marge / jour</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {lignesAffichees.map((l) => (
-                  <MissionRow
-                    key={l.id}
-                    l={{
-                      id: l.id,
-                      nom: l.nom,
-                      freelanceId: l.freelanceId,
-                      clientId: l.clientId,
-                      freelancePrenom: l.freelancePrenom,
-                      freelanceNom: l.freelanceNom,
-                      clientNom: l.clientNom,
-                      tjmAchat: l.tjmAchat,
-                      tjmVente: l.tjmVente,
-                      actif: l.actif,
-                    }}
-                  />
+                {liste.map((mission) => (
+                  <MissionRow key={mission.id} l={mission} />
                 ))}
               </TableBody>
             </Table>

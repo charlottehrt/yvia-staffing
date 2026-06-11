@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
   affectations,
@@ -18,7 +17,7 @@ import { PERIODES, GROUPES } from "./stats-config";
 import { StatsTable, type LigneStat } from "./stats-table";
 import { StatsExport } from "./stats-export";
 import { StatsFiltreDrawer } from "./stats-filtre-drawer";
-import { getSession } from "@/lib/auth/server";
+import { exigerSession } from "@/lib/auth/server";
 
 const arrondi = (n: number) => Math.round(n * 100) / 100;
 
@@ -53,7 +52,7 @@ export default async function PageStatistiques({
     missions?: string;
   }>;
 }) {
-  if (!(await getSession())) redirect("/login");
+  await exigerSession();
 
   const params = await searchParams;
   const maintenant = new Date();

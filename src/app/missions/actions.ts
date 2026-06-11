@@ -1,4 +1,5 @@
 "use server";
+// Le middleware ne protège PAS les Server Actions : chaque mutation vérifie la session.
 
 import { db } from "@/db";
 import { missions, affectations } from "@/db/schema";
@@ -16,10 +17,13 @@ type ValeursMission = {
   tjmVente: string;
 };
 
-// Résultat de la lecture : soit une erreur, soit des valeurs valides.
 type Lecture = { ok: false; erreur: string } | { ok: true; valeurs: ValeursMission };
 
-// Vérifie et lit les champs d'une mission depuis le formulaire.
+async function verifierConnecte(): Promise<Resultat> {
+  if (await getSession()) return { ok: true };
+  return { ok: false, message: "Vous n'êtes pas connecté." };
+}
+
 function lireChampsMission(formData: FormData): Lecture {
   const freelanceId = Number(formData.get("freelanceId"));
   const clientId = Number(formData.get("clientId"));
@@ -30,9 +34,7 @@ function lireChampsMission(formData: FormData): Lecture {
   if (!freelanceId || !clientId) {
     return { ok: false, erreur: "Le freelance et le client sont obligatoires." };
   }
-  if (!nom) {
-    return { ok: false, erreur: "Le nom de la mission est obligatoire." };
-  }
+  if (!nom) return { ok: false, erreur: "Le nom de la mission est obligatoire." };
   if (tjmAchat === "" || tjmVente === "") {
     return { ok: false, erreur: "Les TJM achat et vente sont obligatoires." };
   }
@@ -43,7 +45,8 @@ function lireChampsMission(formData: FormData): Lecture {
 }
 
 export async function creerMission(formData: FormData): Promise<Resultat> {
-  if (!(await getSession())) return { ok: false, message: "Vous n'êtes pas connecté." };
+  const session = await verifierConnecte();
+  if (!session.ok) return session;
 
   const champs = lireChampsMission(formData);
   if (!champs.ok) return { ok: false, message: champs.erreur };
@@ -55,7 +58,8 @@ export async function creerMission(formData: FormData): Promise<Resultat> {
 }
 
 export async function modifierMission(formData: FormData): Promise<Resultat> {
-  if (!(await getSession())) return { ok: false, message: "Vous n'êtes pas connecté." };
+  const session = await verifierConnecte();
+  if (!session.ok) return session;
 
   const id = Number(formData.get("id"));
   if (!id) return { ok: false, message: "Mission introuvable." };
@@ -65,12 +69,10 @@ export async function modifierMission(formData: FormData): Promise<Resultat> {
 
   await db.update(missions).set(champs.valeurs).where(eq(missions.id, id));
 
-  // Option : recopier le nouveau TJM sur les jours déjà posés à partir d'aujourd'hui.
-  // Le passé n'est jamais modifié.
   const appliquerAuxJoursPoses =
     String(formData.get("appliquerAuxJoursPoses")) === "true";
   if (appliquerAuxJoursPoses) {
-    const aujourdhui = new Date().toISOString().slice(0, 10); // "AAAA-MM-JJ"
+    const aujourdhui = new Date().toISOString().slice(0, 10);
     await db
       .update(affectations)
       .set({ tjmAchat: champs.valeurs.tjmAchat, tjmVente: champs.valeurs.tjmVente })
@@ -82,10 +84,9 @@ export async function modifierMission(formData: FormData): Promise<Resultat> {
   return { ok: true };
 }
 
-// Active / désactive une mission (on ne supprime pas, pour garder l'historique).
-// Une mission inactive n'est plus proposée dans le planning.
 export async function basculerActifMission(formData: FormData): Promise<Resultat> {
-  if (!(await getSession())) return { ok: false, message: "Vous n'êtes pas connecté." };
+  const session = await verifierConnecte();
+  if (!session.ok) return session;
 
   const id = Number(formData.get("id"));
   const actif = String(formData.get("actif")) === "true";

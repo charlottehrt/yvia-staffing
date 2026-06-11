@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { verifierSession, SESSION_COOKIE } from "@/lib/auth/session";
 
 // Protège toute l'application : sans session valide, on redirige vers /login.
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const session = await verifierSession(token);
   const { pathname } = req.nextUrl;

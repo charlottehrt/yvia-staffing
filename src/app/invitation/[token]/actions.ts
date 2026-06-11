@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users, invitations } from "@/db/schema";
 import { hasherMotDePasse } from "@/lib/auth/password";
-import { signerSession, SESSION_COOKIE, DUREE_SESSION_MS } from "@/lib/auth/session";
+import { signerSession, pvDepuisHash, SESSION_COOKIE, DUREE_SESSION_MS } from "@/lib/auth/session";
 import { reinitialiserLimite, verifierLimite } from "@/lib/auth/rate-limit";
 
 export type Resultat = { ok: boolean; message?: string };
@@ -33,12 +33,13 @@ export async function accepterInvitation(formData: FormData): Promise<Resultat> 
   const [existant] = await db.select().from(users).where(eq(users.email, inv.email));
   if (existant) return { ok: false, message: "Un compte existe déjà pour cet email." };
 
+  const passwordHash = hasherMotDePasse(motDePasse);
   const role = inv.role === "admin" ? "admin" : "user";
   const [u] = await db
     .insert(users)
     .values({
       email: inv.email,
-      passwordHash: hasherMotDePasse(motDePasse),
+      passwordHash,
       prenom: prenom ?? inv.prenom,
       nom: nom ?? inv.nom,
       role,
@@ -48,7 +49,8 @@ export async function accepterInvitation(formData: FormData): Promise<Resultat> 
 
   // Connexion automatique après création du compte.
   const exp = Date.now() + DUREE_SESSION_MS;
-  const sessToken = await signerSession({ userId: u.id, email: u.email, exp, role });
+  const pv = await pvDepuisHash(passwordHash);
+  const sessToken = await signerSession({ userId: u.id, email: u.email, exp, pv, role });
   (await cookies()).set(SESSION_COOKIE, sessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

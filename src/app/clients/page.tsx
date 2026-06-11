@@ -1,11 +1,10 @@
 // Composant serveur : il lit les données directement dans la base, puis affiche la page.
 
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
+import { exigerSession } from "@/lib/auth/server";
 import { clients } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { getSession } from "@/lib/auth/server";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,8 +29,7 @@ export default async function PageClients({
 }: {
   searchParams: Promise<{ vue?: string }>;
 }) {
-  if (!(await getSession())) redirect("/login");
-
+  await exigerSession();
   const { vue } = await searchParams;
   const archives = vue === "archives";
 
@@ -52,7 +50,6 @@ export default async function PageClients({
         />
       </div>
 
-      {/* Onglets Actifs / Archives */}
       <div className="flex gap-1">
         <Link
           href="/clients"

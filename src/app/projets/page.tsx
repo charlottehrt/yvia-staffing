@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
+import { exigerSession } from "@/lib/auth/server";
 import { projets, clients, freelances, encaissements, decaissements, jalons } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { getSession } from "@/lib/auth/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -33,8 +32,7 @@ export default async function PageProjets({
 }: {
   searchParams: Promise<{ vue?: string }>;
 }) {
-  if (!(await getSession())) redirect("/login");
-
+  await exigerSession();
   const { vue } = await searchParams;
   const archives = vue === "archives";
 
