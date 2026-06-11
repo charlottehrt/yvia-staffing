@@ -22,6 +22,7 @@ import {
 import { formatEuro, formatMois } from "@/lib/format";
 import { premierJourDuMois } from "@/lib/calculs/jours-ouvres";
 import { fractionFiabilite } from "@/lib/calculs/previsionnel";
+import { IndicateursPrevisionnel } from "@/app/previsionnel/indicateurs-previsionnel";
 import { PERIODES } from "@/app/statistiques/stats-config";
 import { StatsFiltres } from "@/app/statistiques/stats-filtres";
 import { StatsFiltreDrawer } from "@/app/statistiques/stats-filtre-drawer";
@@ -215,6 +216,8 @@ export default async function PagePrevisionnel({
     }
   }
 
+  const totalCaMax = arrondi(lignes.reduce((total, ligne) => total + ligne.caMax, 0));
+  const totalCaProb = arrondi(lignes.reduce((total, ligne) => total + ligne.caProb, 0));
   const totalMargeMax = lignes.length ? lignes[lignes.length - 1].cumulMax : 0;
   const totalMargeProb = lignes.length ? lignes[lignes.length - 1].cumulProb : 0;
 
@@ -245,10 +248,12 @@ export default async function PagePrevisionnel({
         </StatsFiltres>
       </Suspense>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Indicateur titre="Marge maximum (cumulée)" valeur={formatEuro(totalMargeMax)} />
-        <Indicateur titre="Marge probable (cumulée)" valeur={formatEuro(totalMargeProb)} />
-      </div>
+      <IndicateursPrevisionnel
+        totalCaMax={totalCaMax}
+        totalCaProb={totalCaProb}
+        totalMargeMax={totalMargeMax}
+        totalMargeProb={totalMargeProb}
+      />
 
       <Card>
         <CardHeader>
@@ -303,18 +308,5 @@ export default async function PagePrevisionnel({
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function Indicateur({ titre, valeur }: { titre: string; valeur: string }) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-xs font-normal text-muted-foreground">{titre}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="font-display text-2xl">{valeur}</p>
-      </CardContent>
-    </Card>
   );
 }
