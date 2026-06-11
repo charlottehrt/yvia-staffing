@@ -8,6 +8,13 @@
       "when": 1781197028019,
       "tag": "0000_projets_crm_simple",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781206994920,
+      "tag": "0001_freelances_afficher_planning",
+      "breakpoints": true
     }
   ]
 }

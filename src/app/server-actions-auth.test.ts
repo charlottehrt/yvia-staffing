@@ -46,6 +46,7 @@ const actionsFormData: Array<[string, (fd: FormData) => Promise<{ ok: boolean; m
   ["freelances.creerFreelance", freelances.creerFreelance],
   ["freelances.modifierFreelance", freelances.modifierFreelance],
   ["freelances.basculerActif", freelances.basculerActif],
+  ["freelances.basculerAfficherPlanning", freelances.basculerAfficherPlanning],
   ["missions.creerMission", missions.creerMission],
   ["missions.modifierMission", missions.modifierMission],
   ["missions.basculerActifMission", missions.basculerActifMission],

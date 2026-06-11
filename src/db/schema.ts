@@ -47,6 +47,9 @@ export const freelances = pgTable("freelances", {
   prenom: text("prenom").notNull(),
   nom: text("nom").notNull(),
   actif: boolean("actif").notNull().default(true), // true = actif, false = inactif
+  // Préférence d'affichage : ligne visible ou non dans le planning du dashboard.
+  // Sans effet sur les missions, affectations ou montants.
+  afficherPlanning: boolean("afficher_planning").notNull().default(true),
 });
 
 // --- CLIENTS ---
