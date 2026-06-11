@@ -88,6 +88,19 @@ npm run db:migrate
 Sur une base de production existante, préférer `npm run db:migrate` afin
 d'appliquer uniquement les changements versionnés.
 
+### 3 bis. Migration automatique sur `main`
+
+Le workflow GitHub Actions `Migrate production database` lance automatiquement
+`npm run db:migrate` à chaque push sur `main`. Il faut configurer dans GitHub le
+secret suivant :
+
+```text
+DATABASE_URL_UNPOOLED=<URL Neon directe>
+```
+
+Cette URL doit être l'URL Neon directe, sans `-pooler`, car les migrations de
+schéma doivent éviter PgBouncer.
+
 ### 4. Créer le premier compte
 
 ```bash
