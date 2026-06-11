@@ -11,32 +11,70 @@ import {
 } from "@/db/schema";
 import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatEuro, formatPourcent, formatJours, formatMois } from "@/lib/format";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { formatEuro, formatPourcent, formatMois } from "@/lib/format";
+import { premierJourDuMois } from "@/lib/calculs/jours-ouvres";
 import { StatsFiltres } from "./stats-filtres";
-import { PERIODES, GROUPES } from "./stats-config";
-import { StatsTable, type LigneStat } from "./stats-table";
-import { StatsExport } from "./stats-export";
+import { PERIODES } from "./stats-config";
 import { StatsFiltreDrawer } from "./stats-filtre-drawer";
 import { exigerSession } from "@/lib/auth/server";
+import {
+  calculerPilotageMensuel,
+  type DecaissementPilotage,
+  type EncaissementPilotage,
+  type LignePrevisionnel,
+  type LigneRealise,
+} from "./pilotage-calculs";
 
-const arrondi = (n: number) => Math.round(n * 100) / 100;
-
+const pad2 = (n: number) => String(n).padStart(2, "0");
 const isoJour = (d: Date) => d.toISOString().slice(0, 10);
 
-// Bornes [debut, fin] (texte "AAAA-MM-JJ") selon la période choisie.
-// Les périodes prédéfinies sont des fenêtres glissantes en jours se terminant
-// aujourd'hui ; "perso" utilise une plage de dates explicite.
-function bornesPeriode(
+function bornesPilotage(
   periode: string,
   debutPerso: string,
-  finPerso: string
-): { debut: string; fin: string } {
-  if (periode === "perso") return { debut: debutPerso, fin: finPerso };
-  const n = Number(periode) || 90;
-  const fin = new Date();
-  const debut = new Date(fin);
-  debut.setUTCDate(debut.getUTCDate() - (n - 1));
-  return { debut: isoJour(debut), fin: isoJour(fin) };
+  finPerso: string,
+  maintenant: Date
+) {
+  const annee = maintenant.getUTCFullYear();
+  const mois = maintenant.getUTCMonth() + 1;
+  const debutMoisCourant = premierJourDuMois(annee, mois);
+
+  if (periode === "perso") {
+    return {
+      debutRealise: debutPerso,
+      finRealise: finPerso,
+      debutPrevisionnel: debutMoisCourant,
+      finPrevisionnel: finPerso,
+    };
+  }
+
+  const n = Number(periode) || 365;
+  const debutRealise = new Date(maintenant);
+  debutRealise.setUTCDate(debutRealise.getUTCDate() - (n - 1));
+  const finPrevisionnel = new Date(maintenant);
+  finPrevisionnel.setUTCDate(finPrevisionnel.getUTCDate() + n);
+
+  return {
+    debutRealise: isoJour(debutRealise),
+    finRealise: isoJour(maintenant),
+    debutPrevisionnel: debutMoisCourant,
+    finPrevisionnel: isoJour(finPrevisionnel),
+  };
+}
+
+function ids(v?: string) {
+  return (v ?? "")
+    .split(",")
+    .map((x) => Number(x))
+    .filter((n) => Number.isFinite(n) && n > 0);
 }
 
 export default async function PageStatistiques({
@@ -44,7 +82,6 @@ export default async function PageStatistiques({
 }: {
   searchParams: Promise<{
     periode?: string;
-    grouper?: string;
     debut?: string;
     fin?: string;
     freelances?: string;
@@ -57,50 +94,23 @@ export default async function PageStatistiques({
   const params = await searchParams;
   const maintenant = new Date();
   const aujourd = isoJour(maintenant);
+  const moisCourant = `${maintenant.getUTCFullYear()}-${pad2(maintenant.getUTCMonth() + 1)}`;
 
-  const periode = PERIODES.some((p) => p.key === params.periode) ? params.periode! : "90";
-  const grouper = GROUPES.some((g) => g.key === params.grouper) ? params.grouper! : "mois";
+  const periode = PERIODES.some((p) => p.key === params.periode) ? params.periode! : "365";
   const debutPerso = params.debut || aujourd;
   const finPerso = params.fin || aujourd;
+  const { debutRealise, finRealise, debutPrevisionnel, finPrevisionnel } = bornesPilotage(
+    periode,
+    debutPerso,
+    finPerso,
+    maintenant
+  );
 
-  const { debut, fin } = bornesPeriode(periode, debutPerso, finPerso);
-
-  // Filtres optionnels (ids séparés par des virgules dans l'URL).
-  const ids = (v?: string) =>
-    (v ?? "")
-      .split(",")
-      .map((x) => Number(x))
-      .filter((n) => Number.isFinite(n) && n > 0);
   const selFreelances = ids(params.freelances);
   const selClients = ids(params.clients);
   const selMissions = ids(params.missions);
+  const forfaitActif = selMissions.length === 0;
 
-  const conditions = [gte(affectations.date, debut), lte(affectations.date, fin)];
-  if (selFreelances.length) conditions.push(inArray(affectations.freelanceId, selFreelances));
-  if (selClients.length) conditions.push(inArray(missions.clientId, selClients));
-  if (selMissions.length) conditions.push(inArray(affectations.missionId, selMissions));
-
-  // Tous les jours posés de la période (et des filtres), avec leurs dimensions.
-  const rowsPromise = db
-    .select({
-      date: affectations.date,
-      tjmAchat: affectations.tjmAchat,
-      tjmVente: affectations.tjmVente,
-      freelanceId: affectations.freelanceId,
-      freelancePrenom: freelances.prenom,
-      freelanceNom: freelances.nom,
-      missionId: affectations.missionId,
-      missionNom: missions.nom,
-      clientId: missions.clientId,
-      clientNom: clients.nom,
-    })
-    .from(affectations)
-    .innerJoin(missions, eq(affectations.missionId, missions.id))
-    .innerJoin(clients, eq(missions.clientId, clients.id))
-    .innerJoin(freelances, eq(affectations.freelanceId, freelances.id))
-    .where(and(...conditions));
-
-  // Listes pour les filtres multi-sélection.
   const optionsPromise = Promise.all([
     db
       .select({ id: freelances.id, prenom: freelances.prenom, nom: freelances.nom })
@@ -114,162 +124,134 @@ export default async function PageStatistiques({
       .orderBy(missions.nom),
   ]);
 
-  // Forfait : on n'inclut pas les projets si un filtre "missions" est posé (un projet
-  // n'est pas une mission). Les encaissements n'ont pas de freelance : on les exclut
-  // si un filtre "freelances" est actif.
-  const forfaitActif = selMissions.length === 0;
-  type EncForfait = { date: string; montant: string; projetId: number; projetNom: string; clientId: number; clientNom: string };
-  type DecForfait = EncForfait & { freelanceId: number; freelancePrenom: string; freelanceNom: string };
-  let encForfaitPromise: Promise<EncForfait[]> = Promise.resolve([]);
-  let decForfaitPromise: Promise<DecForfait[]> = Promise.resolve([]);
+  const condRegie = [gte(affectations.date, debutPrevisionnel), lte(affectations.date, finPrevisionnel)];
+  if (selFreelances.length) condRegie.push(inArray(affectations.freelanceId, selFreelances));
+  if (selClients.length) condRegie.push(inArray(missions.clientId, selClients));
+  if (selMissions.length) condRegie.push(inArray(affectations.missionId, selMissions));
+  const affsPromise = db
+    .select({
+      date: affectations.date,
+      tjmAchat: affectations.tjmAchat,
+      tjmVente: affectations.tjmVente,
+    })
+    .from(affectations)
+    .innerJoin(missions, eq(affectations.missionId, missions.id))
+    .where(and(...condRegie));
+
+  let encaissementsRealisesPromise: Promise<EncaissementPilotage[]> = Promise.resolve([]);
+  let encaissementsPrevusPromise: Promise<EncaissementPilotage[]> = Promise.resolve([]);
+  let decaissementsRealisesPromise: Promise<DecaissementPilotage[]> = Promise.resolve([]);
+  let decaissementsPrevusPromise: Promise<DecaissementPilotage[]> = Promise.resolve([]);
 
   if (forfaitActif) {
     if (selFreelances.length === 0) {
-      const condEnc = [
-        eq(encaissements.statut, "encaisse"), // réalisé uniquement (les stats restent factuelles)
-        gte(encaissements.date, debut),
-        lte(encaissements.date, fin),
+      const condEncRealises = [
+        eq(encaissements.statut, "encaisse"),
+        gte(encaissements.date, debutRealise),
+        lte(encaissements.date, finRealise),
       ];
-      if (selClients.length) condEnc.push(inArray(projets.clientId, selClients));
-      encForfaitPromise = db
+      if (selClients.length) condEncRealises.push(inArray(projets.clientId, selClients));
+      encaissementsRealisesPromise = db
         .select({
           date: encaissements.date,
           montant: encaissements.montant,
-          projetId: projets.id,
-          projetNom: projets.nom,
-          clientId: projets.clientId,
-          clientNom: clients.nom,
+          statut: encaissements.statut,
+          fiabilite: encaissements.fiabilite,
         })
         .from(encaissements)
         .innerJoin(projets, eq(encaissements.projetId, projets.id))
-        .innerJoin(clients, eq(projets.clientId, clients.id))
-        .where(and(...condEnc));
+        .where(and(...condEncRealises));
+
+      const condEncPrevus = [
+        eq(encaissements.statut, "prevu"),
+        gte(encaissements.date, debutPrevisionnel),
+        lte(encaissements.date, finPrevisionnel),
+      ];
+      if (selClients.length) condEncPrevus.push(inArray(projets.clientId, selClients));
+      encaissementsPrevusPromise = db
+        .select({
+          date: encaissements.date,
+          montant: encaissements.montant,
+          statut: encaissements.statut,
+          fiabilite: encaissements.fiabilite,
+        })
+        .from(encaissements)
+        .innerJoin(projets, eq(encaissements.projetId, projets.id))
+        .where(and(...condEncPrevus));
     }
-    const condDec = [
-      eq(decaissements.statut, "decaisse"), // coût réalisé uniquement
-      gte(decaissements.date, debut),
-      lte(decaissements.date, fin),
+
+    const condDecRealises = [
+      eq(decaissements.statut, "decaisse"),
+      gte(decaissements.date, debutRealise),
+      lte(decaissements.date, finRealise),
     ];
-    if (selClients.length) condDec.push(inArray(projets.clientId, selClients));
-    if (selFreelances.length) condDec.push(inArray(decaissements.freelanceId, selFreelances));
-    decForfaitPromise = db
+    if (selClients.length) condDecRealises.push(inArray(projets.clientId, selClients));
+    if (selFreelances.length) condDecRealises.push(inArray(decaissements.freelanceId, selFreelances));
+    decaissementsRealisesPromise = db
       .select({
         date: decaissements.date,
         montant: decaissements.montant,
-        projetId: projets.id,
-        projetNom: projets.nom,
-        clientId: projets.clientId,
-        clientNom: clients.nom,
-        freelanceId: decaissements.freelanceId,
-        freelancePrenom: freelances.prenom,
-        freelanceNom: freelances.nom,
+        statut: decaissements.statut,
       })
       .from(decaissements)
       .innerJoin(projets, eq(decaissements.projetId, projets.id))
-      .innerJoin(clients, eq(projets.clientId, clients.id))
-      .innerJoin(freelances, eq(decaissements.freelanceId, freelances.id))
-      .where(and(...condDec));
+      .where(and(...condDecRealises));
+
+    const condDecPrevus = [
+      eq(decaissements.statut, "prevu"),
+      gte(decaissements.date, debutPrevisionnel),
+      lte(decaissements.date, finPrevisionnel),
+    ];
+    if (selClients.length) condDecPrevus.push(inArray(projets.clientId, selClients));
+    if (selFreelances.length) condDecPrevus.push(inArray(decaissements.freelanceId, selFreelances));
+    decaissementsPrevusPromise = db
+      .select({
+        date: decaissements.date,
+        montant: decaissements.montant,
+        statut: decaissements.statut,
+      })
+      .from(decaissements)
+      .innerJoin(projets, eq(decaissements.projetId, projets.id))
+      .where(and(...condDecPrevus));
   }
 
-  const [rows, [optFreelances, optClients, optMissions], encForfait, decForfait] =
-    await Promise.all([rowsPromise, optionsPromise, encForfaitPromise, decForfaitPromise]);
+  const [
+    affs,
+    encaissementsRealises,
+    encaissementsPrevus,
+    decaissementsRealises,
+    decaissementsPrevus,
+    [optFreelances, optClients, optMissions],
+  ] = await Promise.all([
+    affsPromise,
+    encaissementsRealisesPromise,
+    encaissementsPrevusPromise,
+    decaissementsRealisesPromise,
+    decaissementsPrevusPromise,
+    optionsPromise,
+  ]);
 
-  // Indicateurs globaux : régie (jours posés) + forfait (encaissements / décaissements).
-  const caRegie = rows.reduce((s, r) => s + Number(r.tjmVente), 0);
-  const coutRegie = rows.reduce((s, r) => s + Number(r.tjmAchat), 0);
-  const caForfait = encForfait.reduce((s, e) => s + Number(e.montant), 0);
-  const coutForfait = decForfait.reduce((s, d) => s + Number(d.montant), 0);
-  const caTotal = arrondi(caRegie + caForfait);
-  const coutTotal = arrondi(coutRegie + coutForfait);
-  const margeTotale = arrondi(caTotal - coutTotal);
-  const tauxMarge = caTotal > 0 ? margeTotale / caTotal : 0;
-  const joursTotal = rows.length; // les jours sont une notion de régie
-  const margeJour = joursTotal > 0 ? arrondi((caRegie - coutRegie) / joursTotal) : 0;
+  const pilotage = calculerPilotageMensuel({
+    debutPrevisionnel,
+    finPrevisionnel,
+    affectations: affs,
+    encaissements: [...encaissementsRealises, ...encaissementsPrevus],
+    decaissements: [...decaissementsRealises, ...decaissementsPrevus],
+  });
 
-  // Agrégation par dimension choisie.
-  type Acc = { cle: string; label: string; ordreLabel: string; ca: number; cout: number; jours: number };
-  const map = new Map<string, Acc>();
-  const ajout = (
-    cle: string,
-    label: string,
-    ordreLabel: string,
-    ca: number,
-    cout: number,
-    jours: number
-  ) => {
-    const g = map.get(cle) ?? { cle, label, ordreLabel, ca: 0, cout: 0, jours: 0 };
-    g.ca += ca;
-    g.cout += cout;
-    g.jours += jours;
-    map.set(cle, g);
-  };
-  const dimMois = (date: string) => {
-    const cle = date.slice(0, 7);
-    return { cle, label: formatMois(Number(cle.slice(0, 4)), Number(cle.slice(5, 7))), ordre: cle };
-  };
-
-  // Régie (jours posés).
-  for (const r of rows) {
-    if (grouper === "freelance") {
-      const label = `${r.freelancePrenom} ${r.freelanceNom}`;
-      ajout(`f${r.freelanceId}`, label, label.toLowerCase(), Number(r.tjmVente), Number(r.tjmAchat), 1);
-    } else if (grouper === "client") {
-      ajout(`c${r.clientId}`, r.clientNom, r.clientNom.toLowerCase(), Number(r.tjmVente), Number(r.tjmAchat), 1);
-    } else if (grouper === "mission") {
-      ajout(`m${r.missionId}`, r.missionNom, r.missionNom.toLowerCase(), Number(r.tjmVente), Number(r.tjmAchat), 1);
-    } else {
-      const d = dimMois(r.date);
-      ajout(d.cle, d.label, d.ordre, Number(r.tjmVente), Number(r.tjmAchat), 1);
-    }
-  }
-
-  // Forfait : encaissements (CA). Non attribuable à un freelance.
-  for (const e of encForfait) {
-    if (grouper === "freelance") continue;
-    if (grouper === "client") ajout(`c${e.clientId}`, e.clientNom, e.clientNom.toLowerCase(), Number(e.montant), 0, 0);
-    else if (grouper === "mission") ajout(`p${e.projetId}`, e.projetNom, e.projetNom.toLowerCase(), Number(e.montant), 0, 0);
-    else {
-      const d = dimMois(e.date);
-      ajout(d.cle, d.label, d.ordre, Number(e.montant), 0, 0);
-    }
-  }
-
-  // Forfait : décaissements (coût), rattachés au freelance.
-  for (const d2 of decForfait) {
-    if (grouper === "freelance") {
-      const label = `${d2.freelancePrenom} ${d2.freelanceNom}`;
-      ajout(`f${d2.freelanceId}`, label, label.toLowerCase(), 0, Number(d2.montant), 0);
-    } else if (grouper === "client") {
-      ajout(`c${d2.clientId}`, d2.clientNom, d2.clientNom.toLowerCase(), 0, Number(d2.montant), 0);
-    } else if (grouper === "mission") {
-      ajout(`p${d2.projetId}`, d2.projetNom, d2.projetNom.toLowerCase(), 0, Number(d2.montant), 0);
-    } else {
-      const d = dimMois(d2.date);
-      ajout(d.cle, d.label, d.ordre, 0, Number(d2.montant), 0);
-    }
-  }
-
-  const lignes: LigneStat[] = Array.from(map.values()).map((g) => ({
-    cle: g.cle,
-    label: g.label,
-    ordreLabel: g.ordreLabel,
-    ca: arrondi(g.ca),
-    cout: arrondi(g.cout),
-    marge: arrondi(g.ca - g.cout),
-    taux: g.ca > 0 ? (g.ca - g.cout) / g.ca : 0,
-    jours: g.jours,
-  }));
-
-  // Ordre par défaut : chronologique pour les mois, sinon marge décroissante.
-  if (grouper === "mois") lignes.sort((a, b) => (a.ordreLabel < b.ordreLabel ? -1 : 1));
-  else lignes.sort((a, b) => b.marge - a.marge);
-
-  const labelColonne = GROUPES.find((g) => g.key === grouper)!.label;
+  const totalRealise = totaliserRealise(pilotage.realise);
+  const totalPrevisionnel = totaliserPrevisionnel(pilotage.previsionnel);
 
   return (
     <div className="space-y-6">
       <Suspense>
-        <StatsFiltres periode={periode} grouper={grouper} debut={debutPerso} fin={finPerso}>
+        <StatsFiltres
+          periode={periode}
+          grouper="mois"
+          debut={debutPerso}
+          fin={finPerso}
+          showGrouper={false}
+        >
           <StatsFiltreDrawer
             clients={optClients.map((c) => ({ value: String(c.id), label: c.nom }))}
             freelances={optFreelances.map((f) => ({
@@ -287,34 +269,189 @@ export default async function PageStatistiques({
         </StatsFiltres>
       </Suspense>
 
-      {/* Indicateurs de la période */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <Indicateur titre="CA" valeur={formatEuro(caTotal)} />
-        <Indicateur titre="Coût" valeur={formatEuro(coutTotal)} />
-        <Indicateur titre="Marge" valeur={formatEuro(margeTotale)} />
-        <Indicateur titre="Taux de marge" valeur={formatPourcent(tauxMarge)} />
-        <Indicateur titre="Jours facturés (régie)" valeur={formatJours(joursTotal)} />
-        <Indicateur titre="Marge / jour (régie)" valeur={formatEuro(margeJour)} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Indicateur titre="CA encaissé" valeur={formatEuro(totalRealise.ca)} />
+        <Indicateur titre="Marge réalisée" valeur={formatEuro(totalRealise.marge)} />
+        <Indicateur titre="CA probable" valeur={formatEuro(totalPrevisionnel.caProb)} />
+        <Indicateur titre="Marge probable cumulée" valeur={formatEuro(totalPrevisionnel.cumulProb)} />
       </div>
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <CardTitle>Détail par {labelColonne.toLowerCase()}</CardTitle>
-            <StatsExport lignes={lignes} labelColonne={labelColonne} />
-          </div>
+          <CardTitle>Pilotage mensuel</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {lignes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Aucune donnée sur cette période. Ajustez les filtres ou remplissez le planning.
-            </p>
-          ) : (
-            <StatsTable lignes={lignes} labelColonne={labelColonne} />
-          )}
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-medium">Réalisé</h2>
+                <p className="text-xs text-muted-foreground">Mois passés et mois courant</p>
+              </div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Mois courant inclus :{" "}
+                {formatMois(Number(moisCourant.slice(0, 4)), Number(moisCourant.slice(5, 7)))}
+              </p>
+            </div>
+            {pilotage.realise.length === 0 ? (
+              <p className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+                Aucun encaissement ou décaissement réalisé sur cette fenêtre.
+              </p>
+            ) : (
+              <TableauRealise lignes={pilotage.realise} />
+            )}
+          </section>
+
+          <div className="border-t border-border" />
+
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-medium">Prévisionnel</h2>
+                <p className="text-xs text-muted-foreground">Mois courant et mois futurs</p>
+              </div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Freelances inclus
+              </p>
+            </div>
+            {pilotage.previsionnel.length === 0 ? (
+              <p className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+                Aucune donnée prévisionnelle sur cette fenêtre.
+              </p>
+            ) : (
+              <TableauPrevisionnel lignes={pilotage.previsionnel} />
+            )}
+          </section>
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function totaliserRealise(lignes: LigneRealise[]) {
+  const total = lignes.reduce(
+    (s, l) => ({ ca: s.ca + l.ca, cout: s.cout + l.cout, marge: s.marge + l.marge }),
+    { ca: 0, cout: 0, marge: 0 }
+  );
+  return {
+    ca: total.ca,
+    cout: total.cout,
+    marge: total.marge,
+    taux: total.ca > 0 ? total.marge / total.ca : 0,
+  };
+}
+
+function totaliserPrevisionnel(lignes: LignePrevisionnel[]) {
+  const total = lignes.reduce(
+    (s, l) => ({
+      caMax: s.caMax + l.caMax,
+      caProb: s.caProb + l.caProb,
+      charges: s.charges + l.charges,
+      margeMax: s.margeMax + l.margeMax,
+      margeProb: s.margeProb + l.margeProb,
+    }),
+    { caMax: 0, caProb: 0, charges: 0, margeMax: 0, margeProb: 0 }
+  );
+  return {
+    ...total,
+    cumulProb: lignes.length ? lignes[lignes.length - 1].cumulProb : 0,
+  };
+}
+
+function TableauRealise({ lignes }: { lignes: LigneRealise[] }) {
+  const total = totaliserRealise(lignes);
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Mois</TableHead>
+          <TableHead className="text-right">CA encaissé</TableHead>
+          <TableHead className="text-right">Coûts décaissés</TableHead>
+          <TableHead className="text-right">Marge réalisée</TableHead>
+          <TableHead className="text-right">Taux</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {lignes.map((l) => (
+          <TableRow key={l.cle}>
+            <TableCell className="font-medium capitalize">{formatMois(l.annee, l.mois)}</TableCell>
+            <TableCell className="text-right">{formatEuro(l.ca)}</TableCell>
+            <TableCell className="text-right text-rose-600">{formatEuro(l.cout)}</TableCell>
+            <TableCell className={`text-right ${l.marge < 0 ? "text-rose-600" : ""}`}>
+              {formatEuro(l.marge)}
+            </TableCell>
+            <TableCell className="text-right">{formatPourcent(l.taux)}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+      <TableFooter>
+        <TableRow>
+          <TableCell>Total</TableCell>
+          <TableCell className="text-right">{formatEuro(total.ca)}</TableCell>
+          <TableCell className="text-right">{formatEuro(total.cout)}</TableCell>
+          <TableCell className={`text-right ${total.marge < 0 ? "text-rose-600" : ""}`}>
+            {formatEuro(total.marge)}
+          </TableCell>
+          <TableCell className="text-right">{formatPourcent(total.taux)}</TableCell>
+        </TableRow>
+      </TableFooter>
+    </Table>
+  );
+}
+
+function TableauPrevisionnel({ lignes }: { lignes: LignePrevisionnel[] }) {
+  const total = totaliserPrevisionnel(lignes);
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Mois</TableHead>
+          <TableHead className="text-right">CA max</TableHead>
+          <TableHead className="text-right">CA probable</TableHead>
+          <TableHead className="text-right">Charges prévues</TableHead>
+          <TableHead className="text-right">Marge max</TableHead>
+          <TableHead className="text-right">Marge probable</TableHead>
+          <TableHead className="text-right">Cumul probable</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {lignes.map((l) => (
+          <TableRow key={l.cle}>
+            <TableCell className="font-medium capitalize">{formatMois(l.annee, l.mois)}</TableCell>
+            <TableCell className="text-right">{formatEuro(l.caMax)}</TableCell>
+            <TableCell className="text-right">{formatEuro(l.caProb)}</TableCell>
+            <TableCell className="text-right text-rose-600">{formatEuro(l.charges)}</TableCell>
+            <TableCell className={`text-right ${l.margeMax < 0 ? "text-rose-600" : ""}`}>
+              {formatEuro(l.margeMax)}
+            </TableCell>
+            <TableCell className={`text-right ${l.margeProb < 0 ? "text-rose-600" : ""}`}>
+              {formatEuro(l.margeProb)}
+            </TableCell>
+            <TableCell className={`text-right font-medium ${l.cumulProb < 0 ? "text-rose-600" : ""}`}>
+              {formatEuro(l.cumulProb)}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+      <TableFooter>
+        <TableRow>
+          <TableCell>Total</TableCell>
+          <TableCell className="text-right">{formatEuro(total.caMax)}</TableCell>
+          <TableCell className="text-right">{formatEuro(total.caProb)}</TableCell>
+          <TableCell className="text-right">{formatEuro(total.charges)}</TableCell>
+          <TableCell className={`text-right ${total.margeMax < 0 ? "text-rose-600" : ""}`}>
+            {formatEuro(total.margeMax)}
+          </TableCell>
+          <TableCell className={`text-right ${total.margeProb < 0 ? "text-rose-600" : ""}`}>
+            {formatEuro(total.margeProb)}
+          </TableCell>
+          <TableCell className={`text-right ${total.cumulProb < 0 ? "text-rose-600" : ""}`}>
+            {formatEuro(total.cumulProb)}
+          </TableCell>
+        </TableRow>
+      </TableFooter>
+    </Table>
   );
 }
 

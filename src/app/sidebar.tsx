@@ -15,7 +15,6 @@ import {
   UserCog,
   Building2,
   BarChart3,
-  TrendingUp,
   UserCircle,
   LogOut,
   type LucideIcon,
@@ -31,8 +30,7 @@ const LIENS: Lien[] = [
   { href: "/projets", label: "Projets", icone: FolderKanban },
   { href: "/freelances", label: "Freelances", icone: Users },
   { href: "/clients", label: "Clients", icone: Building2 },
-  { href: "/statistiques", label: "Statistiques", icone: BarChart3 },
-  { href: "/previsionnel", label: "Prévisionnel", icone: TrendingUp },
+  { href: "/statistiques", label: "Pilotage", icone: BarChart3 },
   { href: "/users", label: "Users", icone: UserCog },
 ];
 
