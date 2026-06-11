@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { formatEuro } from "@/lib/format";
 import { estFiabilite } from "@/lib/calculs/previsionnel";
+import { normaliserStatutCommercial } from "@/lib/projets/statut-commercial";
 import { getSession } from "@/lib/auth/server";
 
 // Lit une catégorie de fiabilité depuis le formulaire : une vraie catégorie, ou null
@@ -14,6 +15,15 @@ import { getSession } from "@/lib/auth/server";
 function lireFiabilite(formData: FormData): string | null {
   const v = String(formData.get("fiabilite") ?? "").trim();
   return estFiabilite(v) ? v : null;
+}
+
+const MONTANT_INVALIDE = "__INVALIDE__";
+
+function lireMontantEnvisage(formData: FormData): string | null | typeof MONTANT_INVALIDE {
+  const brut = String(formData.get("montantEnvisage") ?? "").trim();
+  if (brut === "") return null;
+  const n = Number(brut);
+  return Number.isFinite(n) && n >= 0 ? String(n) : MONTANT_INVALIDE;
 }
 
 export type Resultat = { ok: boolean; message?: string };
@@ -39,14 +49,19 @@ export async function creerProjet(formData: FormData): Promise<Resultat> {
   const clientId = Number(formData.get("clientId"));
   const nom = String(formData.get("nom") ?? "").trim();
   const budget = String(formData.get("budget") ?? "").trim();
+  const statutCommercial = normaliserStatutCommercial(String(formData.get("statutCommercial") ?? ""));
+  const montantEnvisage = lireMontantEnvisage(formData);
 
   if (!clientId) return { ok: false, message: "Le client est obligatoire." };
   if (!nom) return { ok: false, message: "Le nom du projet est obligatoire." };
   if (budget === "" || Number(budget) <= 0) {
     return { ok: false, message: "Le budget doit être supérieur à 0." };
   }
+  if (montantEnvisage === MONTANT_INVALIDE) {
+    return { ok: false, message: "Le montant envisagé doit être positif." };
+  }
 
-  await db.insert(projets).values({ clientId, nom, budget });
+  await db.insert(projets).values({ clientId, nom, budget, statutCommercial, montantEnvisage });
   rafraichir();
   return { ok: true };
 }
@@ -59,12 +74,17 @@ export async function modifierProjet(formData: FormData): Promise<Resultat> {
   const clientId = Number(formData.get("clientId"));
   const nom = String(formData.get("nom") ?? "").trim();
   const budget = String(formData.get("budget") ?? "").trim();
+  const statutCommercial = normaliserStatutCommercial(String(formData.get("statutCommercial") ?? ""));
+  const montantEnvisage = lireMontantEnvisage(formData);
 
   if (!id) return { ok: false, message: "Projet introuvable." };
   if (!clientId) return { ok: false, message: "Le client est obligatoire." };
   if (!nom) return { ok: false, message: "Le nom du projet est obligatoire." };
   if (budget === "" || Number(budget) <= 0) {
     return { ok: false, message: "Le budget doit être supérieur à 0." };
+  }
+  if (montantEnvisage === MONTANT_INVALIDE) {
+    return { ok: false, message: "Le montant envisagé doit être positif." };
   }
 
   // Le budget ne peut pas passer sous le total déjà encaissé.
@@ -76,7 +96,10 @@ export async function modifierProjet(formData: FormData): Promise<Resultat> {
     };
   }
 
-  await db.update(projets).set({ clientId, nom, budget }).where(eq(projets.id, id));
+  await db
+    .update(projets)
+    .set({ clientId, nom, budget, statutCommercial, montantEnvisage })
+    .where(eq(projets.id, id));
   rafraichir();
   return { ok: true };
 }

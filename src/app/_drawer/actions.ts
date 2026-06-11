@@ -2,7 +2,7 @@
 // Chargement à la demande du détail d'une entité pour les drawers en cascade,
 // édition inline d'un champ, et bascule actif/inactif (bouton au bas du drawer).
 
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, lte, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -20,6 +20,7 @@ import { estAdmin } from "@/lib/auth/session";
 import { premierJourDuMois, dernierJourDuMois } from "@/lib/calculs/jours-ouvres";
 import { calculMissionRealisee } from "@/lib/calculs/marge";
 import { formatEuro, formatJours } from "@/lib/format";
+import { labelStatutCommercial, normaliserStatutCommercial } from "@/lib/projets/statut-commercial";
 import type { DetailEntite, EntiteRef } from "./types";
 
 const arrondi = (n: number) => Math.round(n * 100) / 100;
@@ -154,7 +155,7 @@ async function chargerClient(id: number): Promise<DetailEntite | null> {
   const projetsRows = await db
     .select({ id: projets.id, nom: projets.nom, actif: projets.actif, budget: projets.budget })
     .from(projets)
-    .where(eq(projets.clientId, id))
+    .where(and(eq(projets.clientId, id), eq(projets.actif, true), ne(projets.statutCommercial, "perdu")))
     .orderBy(projets.nom);
 
   const { debut, fin } = moisCourant();
@@ -275,6 +276,8 @@ async function chargerProjet(id: number): Promise<DetailEntite | null> {
       budget: projets.budget,
       clientId: projets.clientId,
       clientNom: clients.nom,
+      statutCommercial: projets.statutCommercial,
+      montantEnvisage: projets.montantEnvisage,
     })
     .from(projets)
     .innerJoin(clients, eq(projets.clientId, clients.id))
@@ -310,14 +313,21 @@ async function chargerProjet(id: number): Promise<DetailEntite | null> {
   return {
     ref: { type: "projet", id },
     titre: p.nom,
-    sousTitre: p.actif ? "Projet actif" : "Projet archivé",
+    sousTitre: p.actif ? "Projet actif" : "Projet terminé",
     actif: p.actif,
-    actionLabel: "Archiver",
+    actionLabel: "Terminer",
     champs: [
       { cle: "nom", label: "Nom du projet", valeur: p.nom, type: "text" },
       { cle: "budget", label: "Budget (€)", valeur: entier(p.budget), type: "number" },
+      {
+        cle: "montantEnvisage",
+        label: "Montant envisagé (€)",
+        valeur: p.montantEnvisage ? entier(p.montantEnvisage) : "",
+        type: "number",
+      },
     ],
     infos: [
+      { label: "Statut commercial", valeur: labelStatutCommercial(p.statutCommercial) },
       { label: "Encaissé", valeur: formatEuro(totalEnc) },
       { label: "Décaissé", valeur: formatEuro(totalDec) },
       { label: "Marge", valeur: formatEuro(arrondi(totalEnc - totalDec)) },
@@ -379,6 +389,19 @@ export async function modifierChampEntite(
       const n = Number(v);
       if (!Number.isFinite(n) || n <= 0) return { ok: false, message: "Budget invalide." };
       await db.update(projets).set({ budget: String(n) }).where(eq(projets.id, ref.id));
+    } else if (cle === "montantEnvisage") {
+      if (v === "") {
+        await db.update(projets).set({ montantEnvisage: null }).where(eq(projets.id, ref.id));
+      } else {
+        const n = Number(v);
+        if (!Number.isFinite(n) || n < 0) return { ok: false, message: "Montant invalide." };
+        await db.update(projets).set({ montantEnvisage: String(n) }).where(eq(projets.id, ref.id));
+      }
+    } else if (cle === "statutCommercial") {
+      await db
+        .update(projets)
+        .set({ statutCommercial: normaliserStatutCommercial(v) })
+        .where(eq(projets.id, ref.id));
     } else return { ok: false, message: "Champ inconnu." };
   } else {
     return { ok: false, message: "Type inconnu." };

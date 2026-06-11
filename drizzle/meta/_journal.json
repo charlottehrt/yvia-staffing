@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1781197028019,
+      "tag": "0000_projets_crm_simple",
+      "breakpoints": true
+    }
+  ]
+}

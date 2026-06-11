@@ -111,9 +111,13 @@ export const projets = pgTable("projets", {
     .references(() => clients.id),
   nom: text("nom").notNull(),
   budget: numeric("budget", { precision: 12, scale: 2 }).notNull(), // € HT, enveloppe vendue
-  actif: boolean("actif").notNull().default(true), // true = actif, false = archivé
+  actif: boolean("actif").notNull().default(true), // true = actif, false = terminé
   // Surcharge de fiabilité au niveau projet. Vide = hérite du client (cf. cascade prévisionnel).
   fiabiliteDefaut: text("fiabilite_defaut"),
+  // Suivi CRM simple du sujet commercial.
+  // Les projets existants en production seront migrés en "gagne".
+  statutCommercial: text("statut_commercial").notNull().default("a_qualifier"),
+  montantEnvisage: numeric("montant_envisage", { precision: 12, scale: 2 }),
 });
 
 // --- JALONS (forfait) : repères datés d'un projet, SANS impact financier ---

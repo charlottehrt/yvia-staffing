@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db } from "@/db";
 import { exigerSession } from "@/lib/auth/server";
 import { projets, clients, freelances, encaissements, decaissements, jalons } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, ne, or } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ListViewToolbar } from "@/components/list-view-toolbar";
@@ -35,7 +35,7 @@ export default async function PageProjets({
 }) {
   await exigerSession();
   const { vue } = await searchParams;
-  const archives = vue === "archives";
+  const termines = vue === "termines" || vue === "archives";
 
   // On récupère TOUT l'échéancier (prévu + réalisé) : le dialogue "Gérer" en a besoin.
   // Les colonnes du tableau, elles, ne compteront que le réalisé (filtré plus bas).
@@ -45,6 +45,8 @@ export default async function PageProjets({
         id: projets.id,
         nom: projets.nom,
         budget: projets.budget,
+        statutCommercial: projets.statutCommercial,
+        montantEnvisage: projets.montantEnvisage,
         clientId: projets.clientId,
         clientNom: clients.nom,
         clientFiabilite: clients.fiabiliteDefaut,
@@ -53,7 +55,11 @@ export default async function PageProjets({
       })
       .from(projets)
       .innerJoin(clients, eq(projets.clientId, clients.id))
-      .where(eq(projets.actif, !archives))
+      .where(
+        termines
+          ? or(eq(projets.actif, false), eq(projets.statutCommercial, "perdu"))
+          : and(eq(projets.actif, true), ne(projets.statutCommercial, "perdu"))
+      )
       .orderBy(projets.nom),
     db
       .select({
@@ -129,7 +135,7 @@ export default async function PageProjets({
 
   return (
     <div className="space-y-6">
-      {/* Onglets Actifs / Archives */}
+      {/* Onglets Actifs / Terminés */}
       <ListViewToolbar
         action={
           <ProjetFormDialog
@@ -143,18 +149,18 @@ export default async function PageProjets({
         <Link
           href="/projets"
           className={`rounded-md px-3 py-1.5 text-sm ${
-            !archives ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+            !termines ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
           }`}
         >
           Actifs
         </Link>
         <Link
-          href="/projets?vue=archives"
+          href="/projets?vue=termines"
           className={`rounded-md px-3 py-1.5 text-sm ${
-            archives ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+            termines ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
           }`}
         >
-          Archives
+          Terminés
         </Link>
       </ListViewToolbar>
 
@@ -162,13 +168,13 @@ export default async function PageProjets({
         <CardHeader>
           <CardTitle>
             {liste.length} projet{liste.length > 1 ? "s" : ""}
-            {archives ? " archivé" + (liste.length > 1 ? "s" : "") : ""}
+            {termines ? " terminé" + (liste.length > 1 ? "s" : "") : ""}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {liste.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              {archives ? "Aucun projet archivé." : "Aucun projet pour l’instant."}
+              {termines ? "Aucun projet terminé." : "Aucun projet pour l’instant."}
             </p>
           ) : (
             <Table>
@@ -176,6 +182,8 @@ export default async function PageProjets({
                 <TableRow>
                   <TableHead>Projet</TableHead>
                   <TableHead>Client</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead className="text-right">Montant envisagé</TableHead>
                   <TableHead className="text-right">Budget</TableHead>
                   <TableHead className="text-right">Encaissé</TableHead>
                   <TableHead className="text-right">Décaissé</TableHead>
@@ -193,6 +201,8 @@ export default async function PageProjets({
                       clientId: p.clientId,
                       clientNom: p.clientNom,
                       budget: p.budget,
+                      statutCommercial: p.statutCommercial,
+                      montantEnvisage: p.montantEnvisage,
                       fiabiliteDefaut: p.fiabiliteDefaut,
                       clientFiabilite: p.clientFiabilite,
                       actif: p.actif,

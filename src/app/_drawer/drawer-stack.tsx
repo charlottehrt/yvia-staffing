@@ -199,7 +199,7 @@ function DrawerContenu({
             disabled={enCours}
           >
             <Power className="size-4" />
-            {detail.actif ? detail.actionLabel : "Réactiver"}
+            {detail.actif ? detail.actionLabel : entite.type === "projet" ? "Réouvrir" : "Réactiver"}
           </Button>
         </SheetFooter>
       ) : null}

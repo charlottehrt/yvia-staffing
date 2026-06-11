@@ -11,14 +11,14 @@ export function ArchiveProjetButton({ id, actif }: { id: number; actif: boolean 
     fd.set("id", String(id));
     fd.set("actif", String(actif));
     const res = await basculerActifProjet(fd);
-    if (res.ok) toast.success(actif ? "Projet archivé." : "Projet réactivé.");
+    if (res.ok) toast.success(actif ? "Projet terminé." : "Projet rouvert.");
     else toast.error(res.message ?? "Action impossible.");
   }
 
   if (!actif) {
     return (
       <Button variant="outline" size="sm" onClick={basculer}>
-        Réactiver
+        Réouvrir
       </Button>
     );
   }
@@ -27,12 +27,12 @@ export function ArchiveProjetButton({ id, actif }: { id: number; actif: boolean 
     <ConfirmDialog
       trigger={
         <Button variant="outline" size="sm">
-          Archiver
+          Terminer
         </Button>
       }
-      titre="Archiver ce projet ?"
-      description="Il n'apparaîtra plus dans les listes actives. Vous pourrez le réactiver depuis l'onglet Archives."
-      confirmLabel="Archiver"
+      titre="Terminer ce projet ?"
+      description="Il n'apparaîtra plus dans les listes actives. Vous pourrez le retrouver depuis l'onglet Terminés."
+      confirmLabel="Terminer"
       destructif
       onConfirm={basculer}
     />

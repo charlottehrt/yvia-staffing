@@ -11,7 +11,7 @@ import {
   decaissements,
   jalons,
 } from "@/db/schema";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, lte, ne } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -140,7 +140,7 @@ export default async function PagePlanning({
       .select({ id: projets.id, nom: projets.nom, clientNom: clients.nom, budget: projets.budget })
       .from(projets)
       .innerJoin(clients, eq(projets.clientId, clients.id))
-      .where(eq(projets.actif, true))
+      .where(and(eq(projets.actif, true), ne(projets.statutCommercial, "perdu")))
       .orderBy(projets.nom),
     db
       .select({
@@ -151,9 +151,12 @@ export default async function PagePlanning({
         libelle: encaissements.libelle,
       })
       .from(encaissements)
+      .innerJoin(projets, eq(encaissements.projetId, projets.id))
       .where(
         and(
           eq(encaissements.statut, "encaisse"), // réalisé uniquement (le prévu ne compte pas comme CA)
+          eq(projets.actif, true),
+          ne(projets.statutCommercial, "perdu"),
           gte(encaissements.date, debutMois),
           lte(encaissements.date, finMois)
         )
@@ -169,10 +172,13 @@ export default async function PagePlanning({
         nom: freelances.nom,
       })
       .from(decaissements)
+      .innerJoin(projets, eq(decaissements.projetId, projets.id))
       .innerJoin(freelances, eq(decaissements.freelanceId, freelances.id))
       .where(
         and(
           eq(decaissements.statut, "decaisse"), // coût réalisé uniquement
+          eq(projets.actif, true),
+          ne(projets.statutCommercial, "perdu"),
           gte(decaissements.date, debutMois),
           lte(decaissements.date, finMois)
         )
@@ -185,7 +191,15 @@ export default async function PagePlanning({
         libelle: jalons.libelle,
       })
       .from(jalons)
-      .where(and(gte(jalons.date, debutMois), lte(jalons.date, finMois))),
+      .innerJoin(projets, eq(jalons.projetId, projets.id))
+      .where(
+        and(
+          eq(projets.actif, true),
+          ne(projets.statutCommercial, "perdu"),
+          gte(jalons.date, debutMois),
+          lte(jalons.date, finMois)
+        )
+      ),
   ]);
 
   // Événements regroupés par projet puis par date.

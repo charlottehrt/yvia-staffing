@@ -19,6 +19,7 @@ import { ChampInline } from "@/app/_drawer/champ-inline";
 import { modifierChampEntite } from "@/app/_drawer/actions";
 import { formatEuro, formatDate } from "@/lib/format";
 import { pourcentFiabilite } from "@/lib/calculs/previsionnel";
+import { STATUTS_COMMERCIAUX } from "@/lib/projets/statut-commercial";
 import { FreelanceFormDialog } from "@/app/freelances/freelance-form-dialog";
 import { creerFreelance } from "@/app/freelances/actions";
 import { ajouterFreelanceLocal } from "@/lib/entity-options";
@@ -62,6 +63,8 @@ export function ProjetDetailDialog({
     clientId: number;
     clientNom: string;
     budget: string;
+    statutCommercial: string;
+    montantEnvisage: string | null;
     fiabiliteDefaut: string | null;
     clientFiabilite: string | null;
     actif: boolean;
@@ -134,6 +137,23 @@ export function ProjetDetailDialog({
             valeur={String(Math.round(Number(projet.budget)))}
             type="number"
             onSave={(v) => sauverChamp("budget", v)}
+          />
+          <div className="space-y-1">
+            <Label htmlFor={`projet-statut-${projet.id}`}>Statut commercial</Label>
+            <Select
+              id={`projet-statut-${projet.id}`}
+              defaultValue={projet.statutCommercial}
+              options={STATUTS_COMMERCIAUX.map((s) => ({ value: s.key, label: s.label }))}
+              onValueChange={(v) => void sauverChamp("statutCommercial", v)}
+            />
+          </div>
+          <ChampInline
+            label="Montant envisagé (€)"
+            valeur={
+              projet.montantEnvisage ? String(Math.round(Number(projet.montantEnvisage))) : ""
+            }
+            type="number"
+            onSave={(v) => sauverChamp("montantEnvisage", v)}
           />
         </div>
 

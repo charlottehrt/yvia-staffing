@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { formatEuro } from "@/lib/format";
+import { labelStatutCommercial } from "@/lib/projets/statut-commercial";
 import { EntityLink } from "@/app/_drawer/drawer-stack";
 import { ProjetDetailDialog } from "./projet-detail-dialog";
 
@@ -25,6 +26,8 @@ type Projet = {
   clientId: number;
   clientNom: string;
   budget: string;
+  statutCommercial: string;
+  montantEnvisage: string | null;
   fiabiliteDefaut: string | null;
   clientFiabilite: string | null;
   actif: boolean;
@@ -62,6 +65,10 @@ export function ProjetRow({
           <EntityLink type="client" id={projet.clientId} className="hover:text-primary hover:underline">
             {projet.clientNom}
           </EntityLink>
+        </TableCell>
+        <TableCell>{labelStatutCommercial(projet.statutCommercial)}</TableCell>
+        <TableCell className="text-right">
+          {projet.montantEnvisage ? formatEuro(Number(projet.montantEnvisage)) : "-"}
         </TableCell>
         <TableCell className="text-right">{formatEuro(Number(projet.budget))}</TableCell>
         <TableCell className="text-right">{formatEuro(totalEnc)}</TableCell>

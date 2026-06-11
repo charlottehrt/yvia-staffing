@@ -64,7 +64,7 @@ DATABASE_URL_UNPOOLED=<URL Neon directe>
 Vercel détecte automatiquement Next.js pour ce repo. Les commandes par défaut
 suffisent : installation `npm install`, build `npm run build`.
 
-### 3. Créer les tables dans Neon
+### 3. Créer ou migrer les tables dans Neon
 
 Depuis votre machine, sans écrire le secret dans Git :
 
@@ -75,6 +75,31 @@ npm run db:push
 
 Si vous n'avez que l'URL poolée, utilisez `DATABASE_URL` à la place. L'URL
 directe reste préférable pour les opérations de schéma.
+
+Pour appliquer les migrations versionnées sur une base Neon déjà existante,
+utiliser l'URL directe et non l'URL poolée :
+
+```bash
+export DATABASE_URL_UNPOOLED="<URL Neon directe>"
+npm run db:migrate
+```
+
+`npm run db:push` reste utile pour créer une base vide depuis le schéma courant.
+Sur une base de production existante, préférer `npm run db:migrate` afin
+d'appliquer uniquement les changements versionnés.
+
+### 3 bis. Migration automatique sur `main`
+
+Le workflow GitHub Actions `Migrate production database` lance automatiquement
+`npm run db:migrate` à chaque push sur `main`. Il faut configurer dans GitHub le
+secret suivant :
+
+```text
+DATABASE_URL_UNPOOLED=<URL Neon directe>
+```
+
+Cette URL doit être l'URL Neon directe, sans `-pooler`, car les migrations de
+schéma doivent éviter PgBouncer.
 
 ### 4. Créer le premier compte
 
@@ -140,5 +165,6 @@ PORT=3001 npm run dev        # exemple pour lancer un autre worktree à la main
 
 - `npm run dev` : démarrer en développement
 - `npm run db:push` : appliquer le schéma à la base
+- `npm run db:migrate` : appliquer les migrations versionnées (à privilégier en production Neon existante)
 - `npm run db:studio` : explorer la base dans le navigateur
 - `npm test` : lancer les tests

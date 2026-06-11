@@ -9,7 +9,7 @@ import {
   encaissements,
   decaissements,
 } from "@/db/schema";
-import { and, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, ne } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -147,6 +147,8 @@ export default async function PageStatistiques({
     if (selFreelances.length === 0) {
       const condEncRealises = [
         eq(encaissements.statut, "encaisse"),
+        eq(projets.actif, true),
+        ne(projets.statutCommercial, "perdu"),
         gte(encaissements.date, debutRealise),
         lte(encaissements.date, finRealise),
       ];
@@ -164,6 +166,8 @@ export default async function PageStatistiques({
 
       const condEncPrevus = [
         eq(encaissements.statut, "prevu"),
+        eq(projets.actif, true),
+        ne(projets.statutCommercial, "perdu"),
         gte(encaissements.date, debutPrevisionnel),
         lte(encaissements.date, finPrevisionnel),
       ];
@@ -182,6 +186,8 @@ export default async function PageStatistiques({
 
     const condDecRealises = [
       eq(decaissements.statut, "decaisse"),
+      eq(projets.actif, true),
+      ne(projets.statutCommercial, "perdu"),
       gte(decaissements.date, debutRealise),
       lte(decaissements.date, finRealise),
     ];
@@ -199,6 +205,8 @@ export default async function PageStatistiques({
 
     const condDecPrevus = [
       eq(decaissements.statut, "prevu"),
+      eq(projets.actif, true),
+      ne(projets.statutCommercial, "perdu"),
       gte(decaissements.date, debutPrevisionnel),
       lte(decaissements.date, finPrevisionnel),
     ];
