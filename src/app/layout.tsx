@@ -12,7 +12,7 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export const metadata: Metadata = {
-  title: "Yvia - Suivi de marge",
+  title: "Yvia - Dashboard",
   description: "Pilotage de la marge des freelances en mission",
 };
 
