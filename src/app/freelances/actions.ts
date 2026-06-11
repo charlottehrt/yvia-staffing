@@ -66,3 +66,20 @@ export async function basculerActif(formData: FormData): Promise<Resultat> {
   revalidatePath("/freelances");
   return { ok: true };
 }
+
+// Affiche ou masque le freelance dans le planning du dashboard.
+// `afficher` est la valeur cible (celle de l'interrupteur après le clic).
+export async function basculerAfficherPlanning(formData: FormData): Promise<Resultat> {
+  const session = await verifierConnecte();
+  if (!session.ok) return session;
+
+  const id = Number(formData.get("id"));
+  const afficher = String(formData.get("afficher")) === "true";
+  if (!id) return { ok: false, message: "Freelance introuvable." };
+
+  await db.update(freelances).set({ afficherPlanning: afficher }).where(eq(freelances.id, id));
+
+  revalidatePath("/freelances");
+  revalidatePath("/");
+  return { ok: true };
+}

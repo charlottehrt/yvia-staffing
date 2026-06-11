@@ -100,7 +100,12 @@ export default async function PagePlanning({
     jalMois,
   ] = await Promise.all([
     db
-      .select({ id: freelances.id, prenom: freelances.prenom, nom: freelances.nom })
+      .select({
+        id: freelances.id,
+        prenom: freelances.prenom,
+        nom: freelances.nom,
+        afficherPlanning: freelances.afficherPlanning,
+      })
       .from(freelances)
       .where(eq(freelances.actif, true))
       .orderBy(freelances.nom),
@@ -277,34 +282,38 @@ export default async function PagePlanning({
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
 
-  // Lignes de la grille (une par freelance actif).
-  const lignes: LigneFreelance[] = freelancesActifs.map((f) => {
-    const cellules: LigneFreelance["cellules"] = {};
-    for (const a of affs) {
-      if (a.freelanceId === f.id) {
-        cellules[a.date] = {
-          missionNom: a.missionNom,
-          clientNom: a.clientNom,
-          couleur: couleurDe(a.missionId),
-          tjmAchat: a.tjmAchat,
-          tjmVente: a.tjmVente,
-        };
+  // Lignes de la grille (une par freelance actif affiché dans le planning).
+  // Les freelances masqués gardent leurs sélecteurs, affectations et montants :
+  // seule la ligne du calendrier disparaît.
+  const lignes: LigneFreelance[] = freelancesActifs
+    .filter((f) => f.afficherPlanning)
+    .map((f) => {
+      const cellules: LigneFreelance["cellules"] = {};
+      for (const a of affs) {
+        if (a.freelanceId === f.id) {
+          cellules[a.date] = {
+            missionNom: a.missionNom,
+            clientNom: a.clientNom,
+            couleur: couleurDe(a.missionId),
+            tjmAchat: a.tjmAchat,
+            tjmVente: a.tjmVente,
+          };
+        }
       }
-    }
-    return {
-      id: f.id,
-      nom: `${f.prenom} ${f.nom}`,
-      missions: missionsDispo
-        .filter((m) => m.freelanceId === f.id)
-        .map((m) => ({
-          id: m.id,
-          nom: m.nom,
-          clientNom: m.clientNom,
-          couleur: couleurDe(m.id),
-        })),
-      cellules,
-    };
-  });
+      return {
+        id: f.id,
+        nom: `${f.prenom} ${f.nom}`,
+        missions: missionsDispo
+          .filter((m) => m.freelanceId === f.id)
+          .map((m) => ({
+            id: m.id,
+            nom: m.nom,
+            clientNom: m.clientNom,
+            couleur: couleurDe(m.id),
+          })),
+        cellules,
+      };
+    });
 
   // Indicateurs : chaque jour affecté porte son propre TJM (figé à la pose).
   const parMission = new Map<

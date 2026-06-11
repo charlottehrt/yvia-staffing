@@ -95,6 +95,7 @@ export default async function PageFreelances({
                 <TableRow>
                   <TableHead>Nom</TableHead>
                   <TableHead className="text-right">Gain rapporté</TableHead>
+                  {!archives ? <TableHead className="text-right">Planning</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -104,6 +105,7 @@ export default async function PageFreelances({
                     id={freelance.id}
                     nom={`${freelance.prenom} ${freelance.nom}`}
                     gain={gainParFreelance.get(freelance.id) ?? 0}
+                    afficherPlanning={archives ? undefined : freelance.afficherPlanning}
                   />
                 ))}
               </TableBody>
