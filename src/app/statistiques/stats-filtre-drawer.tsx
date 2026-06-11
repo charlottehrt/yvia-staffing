@@ -89,7 +89,7 @@ export function StatsFiltreDrawer({
           </Button>
         }
       />
-      <SheetContent className="max-w-md">
+      <SheetContent>
         <SheetHeader>
           <SheetTitle>Filtres</SheetTitle>
           <p className="text-sm text-muted-foreground">
