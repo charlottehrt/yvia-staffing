@@ -1,6 +1,6 @@
 // Jeton de session signé (HMAC-SHA256) via la Web Crypto API, donc utilisable
-// à la fois côté serveur (Node) et dans le middleware (edge). N'importe rien de
-// spécifique à Node ni à next/headers pour rester compatible edge.
+// à la fois côté serveur (Node) et dans le proxy Next.js. N'importe rien de
+// spécifique à Node ni à next/headers pour rester réutilisable.
 
 export const SESSION_COOKIE = "yvia_session";
 export const DUREE_SESSION_MS = 30 * 24 * 60 * 60 * 1000; // 30 jours

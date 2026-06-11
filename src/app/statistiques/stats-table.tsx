@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Table,
   TableBody,
@@ -24,6 +24,34 @@ export type LigneStat = {
 };
 
 type Colonne = "label" | "ca" | "cout" | "marge" | "taux" | "jours";
+type Tri = { col: Colonne; asc: boolean } | null;
+
+function Entete({
+  col,
+  children,
+  tri,
+  onChangerTri,
+  alignRight = true,
+}: {
+  col: Colonne;
+  children: ReactNode;
+  tri: Tri;
+  onChangerTri: (col: Colonne) => void;
+  alignRight?: boolean;
+}) {
+  const fleche = tri && tri.col === col ? (tri.asc ? " ↑" : " ↓") : "";
+  return (
+    <TableHead className={alignRight ? "text-right" : undefined}>
+      <button
+        onClick={() => onChangerTri(col)}
+        className="font-medium hover:text-foreground"
+      >
+        {children}
+        {fleche}
+      </button>
+    </TableHead>
+  );
+}
 
 export function StatsTable({
   lignes,
@@ -33,7 +61,7 @@ export function StatsTable({
   labelColonne: string;
 }) {
   // tri = null : ordre fourni par le serveur (défaut pertinent selon la dimension).
-  const [tri, setTri] = useState<{ col: Colonne; asc: boolean } | null>(null);
+  const [tri, setTri] = useState<Tri>(null);
 
   const lignesTriees = [...lignes];
   if (tri) {
@@ -65,41 +93,28 @@ export function StatsTable({
     setTri((t) => (t && t.col === col ? { col, asc: !t.asc } : { col, asc: col === "label" }));
   }
 
-  function Entete({
-    col,
-    children,
-    alignRight = true,
-  }: {
-    col: Colonne;
-    children: React.ReactNode;
-    alignRight?: boolean;
-  }) {
-    const fleche = tri && tri.col === col ? (tri.asc ? " ↑" : " ↓") : "";
-    return (
-      <TableHead className={alignRight ? "text-right" : undefined}>
-        <button
-          onClick={() => changerTri(col)}
-          className="font-medium hover:text-foreground"
-        >
-          {children}
-          {fleche}
-        </button>
-      </TableHead>
-    );
-  }
-
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <Entete col="label" alignRight={false}>
+          <Entete col="label" tri={tri} onChangerTri={changerTri} alignRight={false}>
             {labelColonne}
           </Entete>
-          <Entete col="ca">CA</Entete>
-          <Entete col="cout">Coût</Entete>
-          <Entete col="marge">Marge</Entete>
-          <Entete col="taux">Taux</Entete>
-          <Entete col="jours">Jours</Entete>
+          <Entete col="ca" tri={tri} onChangerTri={changerTri}>
+            CA
+          </Entete>
+          <Entete col="cout" tri={tri} onChangerTri={changerTri}>
+            Coût
+          </Entete>
+          <Entete col="marge" tri={tri} onChangerTri={changerTri}>
+            Marge
+          </Entete>
+          <Entete col="taux" tri={tri} onChangerTri={changerTri}>
+            Taux
+          </Entete>
+          <Entete col="jours" tri={tri} onChangerTri={changerTri}>
+            Jours
+          </Entete>
         </TableRow>
       </TableHeader>
       <TableBody>

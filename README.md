@@ -28,6 +28,76 @@ Puis ouvrir le navigateur sur **http://localhost:3000**
 
 Pour arrêter : `Ctrl + C` dans le terminal. Pour arrêter la base : `docker compose down`.
 
+## Déployer sur Vercel + Neon
+
+### 1. Créer la base Neon
+
+Dans Neon, créer un projet PostgreSQL puis récupérer deux URLs de connexion :
+
+- l'URL **pooled** pour l'application Vercel. Elle contient `-pooler` dans l'hôte
+  et `sslmode=require` dans les paramètres ;
+- l'URL **directe** pour les opérations d'administration Drizzle
+  (`npm run db:push`, création du premier utilisateur).
+
+### 2. Configurer les variables Vercel
+
+Dans le projet Vercel, ajouter ces variables pour `Production` et, si besoin,
+`Preview` :
+
+```text
+DATABASE_URL=<URL Neon pooled>
+SESSION_SECRET=<secret aleatoire long>
+```
+
+Générer le secret de session :
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Optionnel mais recommandé pour les commandes d'administration :
+
+```text
+DATABASE_URL_UNPOOLED=<URL Neon directe>
+```
+
+Vercel détecte automatiquement Next.js pour ce repo. Les commandes par défaut
+suffisent : installation `npm install`, build `npm run build`.
+
+### 3. Créer les tables dans Neon
+
+Depuis votre machine, sans écrire le secret dans Git :
+
+```bash
+export DATABASE_URL_UNPOOLED="<URL Neon directe>"
+npm run db:push
+```
+
+Si vous n'avez que l'URL poolée, utilisez `DATABASE_URL` à la place. L'URL
+directe reste préférable pour les opérations de schéma.
+
+### 4. Créer le premier compte
+
+```bash
+export DATABASE_URL_UNPOOLED="<URL Neon directe>"
+npm run creer-utilisateur -- associe@example.com "mot-de-passe-solide" "Nom"
+```
+
+Ne lancez `npm run seed` ou `npm run seed:simulation` en production que si vous
+voulez volontairement charger des données de démonstration.
+
+### 5. Déployer
+
+Depuis l'interface Vercel, connecter le dépôt GitHub et déployer la branche
+principale. En CLI, après connexion à Vercel :
+
+```bash
+npx vercel --prod
+```
+
+Après le déploiement, ouvrir `/login` sur l'URL Vercel et se connecter avec le
+compte créé à l'étape précédente.
+
 ## Structure
 
 - `src/app/` : les pages (les écrans que l'utilisateur voit) et le code serveur (API).

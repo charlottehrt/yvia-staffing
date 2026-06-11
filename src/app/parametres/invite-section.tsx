@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,16 @@ import { creerInvitation, supprimerInvitation } from "./actions";
 
 type Invitation = { id: number; email: string; nom: string | null; token: string };
 
+const subscribeOrigin = () => () => {};
+const getOriginSnapshot = () => window.location.origin;
+const getServerOriginSnapshot = () => "";
+
 export function InviteSection({ invitations }: { invitations: Invitation[] }) {
-  const [origin, setOrigin] = useState("");
-  useEffect(() => setOrigin(window.location.origin), []);
+  const origin = useSyncExternalStore(
+    subscribeOrigin,
+    getOriginSnapshot,
+    getServerOriginSnapshot
+  );
   const lien = (token: string) => `${origin}/invitation/${token}`;
 
   async function copier(token: string) {
@@ -34,7 +41,7 @@ export function InviteSection({ invitations }: { invitations: Invitation[] }) {
         className="flex flex-wrap items-end gap-3"
       >
         <div className="space-y-2">
-          <Label htmlFor="inv-email">Email de l'invité</Label>
+          <Label htmlFor="inv-email">Email de l&apos;invité</Label>
           <Input id="inv-email" name="email" type="email" required />
         </div>
         <div className="space-y-2">

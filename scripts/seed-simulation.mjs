@@ -13,9 +13,9 @@
 // À n'utiliser qu'en développement.
 
 import "dotenv/config";
-import postgres from "postgres";
+import { createSqlClient } from "./db-url.mjs";
 
-const sql = postgres(process.env.DATABASE_URL);
+const sql = createSqlClient();
 
 // --- Jours fériés français à exclure (sous-ensemble couvrant mai-juillet 2026) ---
 const feries2026 = new Set([

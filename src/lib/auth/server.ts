@@ -1,5 +1,5 @@
 // Helpers d'authentification réservés au serveur (utilisent next/headers et la
-// base). Ne pas importer dans le middleware (edge) ni côté client.
+// base). Ne pas importer dans le proxy Next.js ni côté client.
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -27,7 +27,7 @@ export async function getSession(): Promise<Session | null> {
 
 // À appeler en tête des pages protégées : renvoie la session ou redirige vers
 // /login. Centralise le contrôle d'accès des Server Components qui lisent des
-// données (le middleware ne fait qu'un filtrage optimiste, sans accès base).
+// données (le proxy ne fait qu'un filtrage optimiste, sans accès base).
 export async function exigerSession(): Promise<Session> {
   const session = await getSession();
   if (!session) redirect("/login");
