@@ -47,4 +47,86 @@ describe("calculerPilotageMensuel", () => {
       "2026-09",
     ]);
   });
+
+  it("detaille un mois previsionnel par freelance, encaissements et decaissements prevus", () => {
+    const resultat = calculerPilotageMensuel({
+      debutPrevisionnel: "2026-06-01",
+      finPrevisionnel: "2026-06-30",
+      affectations: [
+        {
+          date: "2026-06-03",
+          tjmAchat: 500,
+          tjmVente: 800,
+          freelanceNom: "Ada Lovelace",
+          missionNom: "Refonte CRM",
+          clientNom: "ACME",
+        },
+        {
+          date: "2026-06-04",
+          tjmAchat: 500,
+          tjmVente: 800,
+          freelanceNom: "Ada Lovelace",
+          missionNom: "Refonte CRM",
+          clientNom: "ACME",
+        },
+      ],
+      encaissements: [
+        {
+          date: "2026-06-15",
+          montant: 10000,
+          statut: "prevu",
+          fiabilite: "80",
+          projetNom: "Forfait Data",
+          clientNom: "Globex",
+          libelle: "Acompte",
+        },
+      ],
+      decaissements: [
+        {
+          date: "2026-06-20",
+          montant: 3000,
+          statut: "prevu",
+          projetNom: "Forfait Data",
+          clientNom: "Globex",
+          freelanceNom: "Grace Hopper",
+          libelle: "Sprint 1",
+        },
+      ],
+    });
+
+    expect(resultat.previsionnel[0].details.regie).toEqual([
+      {
+        cle: "Ada Lovelace|Refonte CRM|ACME|500|800",
+        freelanceNom: "Ada Lovelace",
+        missionNom: "Refonte CRM",
+        clientNom: "ACME",
+        jours: 2,
+        caMax: 1600,
+        caProb: 1600,
+        charges: 1000,
+        marge: 600,
+      },
+    ]);
+    expect(resultat.previsionnel[0].details.encaissements).toEqual([
+      {
+        date: "2026-06-15",
+        projetNom: "Forfait Data",
+        clientNom: "Globex",
+        libelle: "Acompte",
+        montant: 10000,
+        montantProbable: 8000,
+        fiabilite: "80",
+      },
+    ]);
+    expect(resultat.previsionnel[0].details.decaissements).toEqual([
+      {
+        date: "2026-06-20",
+        projetNom: "Forfait Data",
+        clientNom: "Globex",
+        freelanceNom: "Grace Hopper",
+        libelle: "Sprint 1",
+        montant: 3000,
+      },
+    ]);
+  });
 });

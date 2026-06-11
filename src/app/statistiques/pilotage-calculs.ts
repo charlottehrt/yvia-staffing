@@ -6,6 +6,9 @@ export type AffectationPilotage = {
   date: string;
   tjmAchat: Montant;
   tjmVente: Montant;
+  freelanceNom?: string;
+  missionNom?: string;
+  clientNom?: string;
 };
 
 export type EncaissementPilotage = {
@@ -13,12 +16,19 @@ export type EncaissementPilotage = {
   montant: Montant;
   statut: string;
   fiabilite: string | null;
+  projetNom?: string;
+  clientNom?: string;
+  libelle?: string | null;
 };
 
 export type DecaissementPilotage = {
   date: string;
   montant: Montant;
   statut: string;
+  projetNom?: string;
+  clientNom?: string;
+  freelanceNom?: string;
+  libelle?: string | null;
 };
 
 export type LigneRealise = {
@@ -42,13 +52,61 @@ export type LignePrevisionnel = {
   margeProb: number;
   cumulMax: number;
   cumulProb: number;
+  details: DetailsPrevisionnel;
 };
 
 type AccRealise = { ca: number; cout: number };
-type AccPrevisionnel = { caMax: number; caProb: number; charges: number };
+type AccPrevisionnel = {
+  caMax: number;
+  caProb: number;
+  charges: number;
+  details: {
+    regie: Map<string, DetailRegiePrevisionnel>;
+    encaissements: DetailEncaissementPrevu[];
+    decaissements: DetailDecaissementPrevu[];
+  };
+};
+
+export type DetailRegiePrevisionnel = {
+  cle: string;
+  freelanceNom: string;
+  missionNom: string;
+  clientNom: string;
+  jours: number;
+  caMax: number;
+  caProb: number;
+  charges: number;
+  marge: number;
+};
+
+export type DetailEncaissementPrevu = {
+  date: string;
+  projetNom: string;
+  clientNom: string;
+  libelle: string | null;
+  montant: number;
+  montantProbable: number;
+  fiabilite: string | null;
+};
+
+export type DetailDecaissementPrevu = {
+  date: string;
+  projetNom: string;
+  clientNom: string;
+  freelanceNom: string;
+  libelle: string | null;
+  montant: number;
+};
+
+export type DetailsPrevisionnel = {
+  regie: DetailRegiePrevisionnel[];
+  encaissements: DetailEncaissementPrevu[];
+  decaissements: DetailDecaissementPrevu[];
+};
 
 const arrondi = (n: number) => Math.round(n * 100) / 100;
 const nombre = (n: Montant) => Number(n);
+const libelle = (v: string | null | undefined, fallback: string) => v?.trim() || fallback;
 
 export function cleMois(date: string) {
   return date.slice(0, 7);
@@ -73,6 +131,46 @@ function moisEntre(debut: string, fin: string) {
 
 function dansFenetre(date: string, debut: string, fin: string) {
   return date >= debut && date <= fin;
+}
+
+function creerAccPrevisionnel(): AccPrevisionnel {
+  return {
+    caMax: 0,
+    caProb: 0,
+    charges: 0,
+    details: {
+      regie: new Map(),
+      encaissements: [],
+      decaissements: [],
+    },
+  };
+}
+
+function detailsPrevisionnel(acc: AccPrevisionnel): DetailsPrevisionnel {
+  const regie = Array.from(acc.details.regie.values())
+    .sort((a, b) =>
+      `${a.freelanceNom}|${a.clientNom}|${a.missionNom}`.localeCompare(
+        `${b.freelanceNom}|${b.clientNom}|${b.missionNom}`,
+        "fr"
+      )
+    )
+    .map((d) => ({
+      ...d,
+      caMax: arrondi(d.caMax),
+      caProb: arrondi(d.caProb),
+      charges: arrondi(d.charges),
+      marge: arrondi(d.marge),
+    }));
+
+  return {
+    regie,
+    encaissements: acc.details.encaissements
+      .slice()
+      .sort((a, b) => `${a.date}|${a.projetNom}`.localeCompare(`${b.date}|${b.projetNom}`, "fr")),
+    decaissements: acc.details.decaissements
+      .slice()
+      .sort((a, b) => `${a.date}|${a.projetNom}`.localeCompare(`${b.date}|${b.projetNom}`, "fr")),
+  };
 }
 
 export function calculerPilotageMensuel({
@@ -100,7 +198,7 @@ export function calculerPilotageMensuel({
     return acc;
   };
   const getPrevisionnel = (cle: string) => {
-    const acc = previsionnel.get(cle) ?? { caMax: 0, caProb: 0, charges: 0 };
+    const acc = previsionnel.get(cle) ?? creerAccPrevisionnel();
     previsionnel.set(cle, acc);
     if (!dernierMoisPrevisionnel || dernierMoisPrevisionnel < cle) dernierMoisPrevisionnel = cle;
     return acc;
@@ -112,8 +210,18 @@ export function calculerPilotageMensuel({
     } else if (e.statut === "prevu" && dansFenetre(e.date, debutPrevisionnel, finPrevisionnel)) {
       const mois = getPrevisionnel(cleMois(e.date));
       const montant = nombre(e.montant);
+      const montantProbable = montant * fractionFiabilite(e.fiabilite);
       mois.caMax += montant;
-      mois.caProb += montant * fractionFiabilite(e.fiabilite);
+      mois.caProb += montantProbable;
+      mois.details.encaissements.push({
+        date: e.date,
+        projetNom: libelle(e.projetNom, "Projet non renseigné"),
+        clientNom: libelle(e.clientNom, "Client non renseigné"),
+        libelle: e.libelle ?? null,
+        montant: arrondi(montant),
+        montantProbable: arrondi(montantProbable),
+        fiabilite: e.fiabilite,
+      });
     }
   }
 
@@ -121,7 +229,17 @@ export function calculerPilotageMensuel({
     if (d.statut === "decaisse") {
       getRealise(cleMois(d.date)).cout += nombre(d.montant);
     } else if (d.statut === "prevu" && dansFenetre(d.date, debutPrevisionnel, finPrevisionnel)) {
-      getPrevisionnel(cleMois(d.date)).charges += nombre(d.montant);
+      const mois = getPrevisionnel(cleMois(d.date));
+      const montant = nombre(d.montant);
+      mois.charges += montant;
+      mois.details.decaissements.push({
+        date: d.date,
+        projetNom: libelle(d.projetNom, "Projet non renseigné"),
+        clientNom: libelle(d.clientNom, "Client non renseigné"),
+        freelanceNom: libelle(d.freelanceNom, "Freelance non renseigné"),
+        libelle: d.libelle ?? null,
+        montant: arrondi(montant),
+      });
     }
   }
 
@@ -129,9 +247,34 @@ export function calculerPilotageMensuel({
     if (!dansFenetre(a.date, debutPrevisionnel, finPrevisionnel)) continue;
     const mois = getPrevisionnel(cleMois(a.date));
     const ca = nombre(a.tjmVente);
+    const charges = nombre(a.tjmAchat);
     mois.caMax += ca;
     mois.caProb += ca;
-    mois.charges += nombre(a.tjmAchat);
+    mois.charges += charges;
+
+    const freelanceNom = libelle(a.freelanceNom, "Freelance non renseigné");
+    const missionNom = libelle(a.missionNom, "Mission non renseignée");
+    const clientNom = libelle(a.clientNom, "Client non renseigné");
+    const cleDetail = [freelanceNom, missionNom, clientNom, nombre(a.tjmAchat), nombre(a.tjmVente)].join("|");
+    const detail =
+      mois.details.regie.get(cleDetail) ??
+      ({
+        cle: cleDetail,
+        freelanceNom,
+        missionNom,
+        clientNom,
+        jours: 0,
+        caMax: 0,
+        caProb: 0,
+        charges: 0,
+        marge: 0,
+      } satisfies DetailRegiePrevisionnel);
+    detail.jours += 1;
+    detail.caMax += ca;
+    detail.caProb += ca;
+    detail.charges += charges;
+    detail.marge += ca - charges;
+    mois.details.regie.set(cleDetail, detail);
   }
 
   const lignesRealise: LigneRealise[] = Array.from(realise.entries())
@@ -156,7 +299,7 @@ export function calculerPilotageMensuel({
     let cumulMax = 0;
     let cumulProb = 0;
     for (const cle of moisEntre(debutMoisPrevisionnel, fin)) {
-      const acc = previsionnel.get(cle) ?? { caMax: 0, caProb: 0, charges: 0 };
+      const acc = previsionnel.get(cle) ?? creerAccPrevisionnel();
       const margeMax = acc.caMax - acc.charges;
       const margeProb = acc.caProb - acc.charges;
       cumulMax += margeMax;
@@ -171,6 +314,7 @@ export function calculerPilotageMensuel({
         margeProb: arrondi(margeProb),
         cumulMax: arrondi(cumulMax),
         cumulProb: arrondi(cumulProb),
+        details: detailsPrevisionnel(acc),
       });
     }
   }
