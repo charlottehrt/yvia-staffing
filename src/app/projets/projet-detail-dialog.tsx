@@ -125,7 +125,7 @@ export function ProjetDetailDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="max-w-2xl">
+      <SheetContent>
         <SheetHeader>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Projet</p>
           <SheetTitle>

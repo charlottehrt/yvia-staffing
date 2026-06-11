@@ -9,6 +9,23 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { XIcon } from "lucide-react";
 
+const SHEET_CONTENT_BASE_CLASSNAME =
+  "fixed inset-y-0 right-0 z-50 flex h-full w-full flex-col gap-4 overflow-y-auto bg-popover p-5 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/10 duration-200 outline-none data-open:animate-in data-open:slide-in-from-right data-closed:animate-out data-closed:slide-out-to-right";
+
+const SHEET_CONTENT_WIDTH_CLASSNAME = "max-w-2xl";
+
+type SheetContentClassName = DialogPrimitive.Popup.Props["className"];
+type SheetContentState = DialogPrimitive.Popup.State;
+
+function getSheetContentClassName(className?: SheetContentClassName): SheetContentClassName {
+  if (typeof className === "function") {
+    return (state: SheetContentState) =>
+      cn(SHEET_CONTENT_BASE_CLASSNAME, className(state), SHEET_CONTENT_WIDTH_CLASSNAME);
+  }
+
+  return cn(SHEET_CONTENT_BASE_CLASSNAME, className, SHEET_CONTENT_WIDTH_CLASSNAME);
+}
+
 function Sheet({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="sheet" {...props} />;
 }
@@ -33,10 +50,7 @@ function SheetContent({
       />
       <DialogPrimitive.Popup
         data-slot="sheet-content"
-        className={cn(
-          "fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-lg flex-col gap-4 overflow-y-auto bg-popover p-5 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/10 duration-200 outline-none data-open:animate-in data-open:slide-in-from-right data-closed:animate-out data-closed:slide-out-to-right",
-          className
-        )}
+        className={getSheetContentClassName(className)}
         {...props}
       >
         {children}
@@ -77,4 +91,4 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-export { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetFooter };
+export { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetFooter, getSheetContentClassName };
