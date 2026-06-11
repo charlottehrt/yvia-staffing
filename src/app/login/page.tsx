@@ -27,11 +27,7 @@ export default function PageConnexion() {
                 setEnCours(true);
                 const res = await connexion(formData);
                 setEnCours(false);
-                if (res.ok) {
-                  window.location.assign("/");
-                } else {
-                  toast.error(res.message ?? "Une erreur est survenue.");
-                }
+                toast.error(res.message ?? "Une erreur est survenue.");
               }}
               className="space-y-4"
             >

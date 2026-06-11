@@ -39,7 +39,7 @@ export async function connexion(formData: FormData): Promise<Resultat> {
     path: "/",
     expires: new Date(exp),
   });
-  return { ok: true };
+  redirect("/");
 }
 
 export async function deconnexion(): Promise<void> {

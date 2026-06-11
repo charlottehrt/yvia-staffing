@@ -3,12 +3,13 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { verifierSession, pvDepuisHash, SESSION_COOKIE, type Session } from "./session";
 
-export async function getSession(): Promise<Session | null> {
+export const getSession = cache(async function getSession(): Promise<Session | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const session = await verifierSession(token);
   if (!session) return null;
@@ -29,7 +30,7 @@ export async function getSession(): Promise<Session | null> {
     pv: session.pv,
     role: u.role === "user" ? "user" : "admin",
   };
-}
+});
 
 // À appeler en tête des pages protégées : renvoie la session ou redirige vers
 // /login. Centralise le contrôle d'accès des Server Components qui lisent des
