@@ -6,7 +6,7 @@ import { projets, clients, encaissements, decaissements, jalons } from "@/db/sch
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { formatEuro } from "@/lib/format";
-import { estFiabilite } from "@/lib/calculs/previsionnel";
+import { estFiabilite, normaliserFiabiliteEcheance } from "@/lib/calculs/previsionnel";
 import { normaliserStatutCommercial } from "@/lib/projets/statut-commercial";
 import { getSession } from "@/lib/auth/server";
 
@@ -15,15 +15,6 @@ import { getSession } from "@/lib/auth/server";
 function lireFiabilite(formData: FormData): string | null {
   const v = String(formData.get("fiabilite") ?? "").trim();
   return estFiabilite(v) ? v : null;
-}
-
-const MONTANT_INVALIDE = "__INVALIDE__";
-
-function lireMontantEnvisage(formData: FormData): string | null | typeof MONTANT_INVALIDE {
-  const brut = String(formData.get("montantEnvisage") ?? "").trim();
-  if (brut === "") return null;
-  const n = Number(brut);
-  return Number.isFinite(n) && n >= 0 ? String(n) : MONTANT_INVALIDE;
 }
 
 export type Resultat = { ok: boolean; message?: string };
@@ -50,18 +41,14 @@ export async function creerProjet(formData: FormData): Promise<Resultat> {
   const nom = String(formData.get("nom") ?? "").trim();
   const budget = String(formData.get("budget") ?? "").trim();
   const statutCommercial = normaliserStatutCommercial(String(formData.get("statutCommercial") ?? ""));
-  const montantEnvisage = lireMontantEnvisage(formData);
 
   if (!clientId) return { ok: false, message: "Le client est obligatoire." };
   if (!nom) return { ok: false, message: "Le nom du projet est obligatoire." };
   if (budget === "" || Number(budget) <= 0) {
     return { ok: false, message: "Le budget doit être supérieur à 0." };
   }
-  if (montantEnvisage === MONTANT_INVALIDE) {
-    return { ok: false, message: "Le montant envisagé doit être positif." };
-  }
 
-  await db.insert(projets).values({ clientId, nom, budget, statutCommercial, montantEnvisage });
+  await db.insert(projets).values({ clientId, nom, budget, statutCommercial });
   rafraichir();
   return { ok: true };
 }
@@ -75,16 +62,12 @@ export async function modifierProjet(formData: FormData): Promise<Resultat> {
   const nom = String(formData.get("nom") ?? "").trim();
   const budget = String(formData.get("budget") ?? "").trim();
   const statutCommercial = normaliserStatutCommercial(String(formData.get("statutCommercial") ?? ""));
-  const montantEnvisage = lireMontantEnvisage(formData);
 
   if (!id) return { ok: false, message: "Projet introuvable." };
   if (!clientId) return { ok: false, message: "Le client est obligatoire." };
   if (!nom) return { ok: false, message: "Le nom du projet est obligatoire." };
   if (budget === "" || Number(budget) <= 0) {
     return { ok: false, message: "Le budget doit être supérieur à 0." };
-  }
-  if (montantEnvisage === MONTANT_INVALIDE) {
-    return { ok: false, message: "Le montant envisagé doit être positif." };
   }
 
   // Le budget ne peut pas passer sous le total déjà encaissé.
@@ -98,7 +81,7 @@ export async function modifierProjet(formData: FormData): Promise<Resultat> {
 
   await db
     .update(projets)
-    .set({ clientId, nom, budget, statutCommercial, montantEnvisage })
+    .set({ clientId, nom, budget, statutCommercial })
     .where(eq(projets.id, id));
   rafraichir();
   return { ok: true };
@@ -127,8 +110,12 @@ export async function ajouterEncaissement(formData: FormData): Promise<Resultat>
   const libelle = String(formData.get("libelle") ?? "").trim() || null;
   // Statut : 'encaisse' (réalisé) par défaut, 'prevu' pour une échéance attendue.
   const statut = String(formData.get("statut")) === "prevu" ? "prevu" : "encaisse";
-  // Fiabilité seulement pertinente pour une échéance prévue.
-  const fiabilite = statut === "prevu" ? lireFiabilite(formData) : null;
+  // Fiabilité seulement pertinente pour une échéance prévue : un pourcentage
+  // 0-100 saisi dans le formulaire (ou une ancienne catégorie), sinon null.
+  const fiabilite =
+    statut === "prevu"
+      ? normaliserFiabiliteEcheance(String(formData.get("fiabilite") ?? ""))
+      : null;
 
   if (!projetId) return { ok: false, message: "Projet introuvable." };
   if (!date) return { ok: false, message: "La date est obligatoire." };

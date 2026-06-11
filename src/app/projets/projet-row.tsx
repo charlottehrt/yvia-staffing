@@ -27,7 +27,6 @@ type Projet = {
   clientNom: string;
   budget: string;
   statutCommercial: string;
-  montantEnvisage: string | null;
   fiabiliteDefaut: string | null;
   clientFiabilite: string | null;
   actif: boolean;
@@ -67,9 +66,6 @@ export function ProjetRow({
           </EntityLink>
         </TableCell>
         <TableCell>{labelStatutCommercial(projet.statutCommercial)}</TableCell>
-        <TableCell className="text-right">
-          {projet.montantEnvisage ? formatEuro(Number(projet.montantEnvisage)) : "-"}
-        </TableCell>
         <TableCell className="text-right">{formatEuro(Number(projet.budget))}</TableCell>
         <TableCell className="text-right">{formatEuro(totalEnc)}</TableCell>
         <TableCell className="text-right">{formatEuro(totalDec)}</TableCell>

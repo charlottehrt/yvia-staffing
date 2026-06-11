@@ -277,7 +277,6 @@ async function chargerProjet(id: number): Promise<DetailEntite | null> {
       clientId: projets.clientId,
       clientNom: clients.nom,
       statutCommercial: projets.statutCommercial,
-      montantEnvisage: projets.montantEnvisage,
     })
     .from(projets)
     .innerJoin(clients, eq(projets.clientId, clients.id))
@@ -319,12 +318,6 @@ async function chargerProjet(id: number): Promise<DetailEntite | null> {
     champs: [
       { cle: "nom", label: "Nom du projet", valeur: p.nom, type: "text" },
       { cle: "budget", label: "Budget (€)", valeur: entier(p.budget), type: "number" },
-      {
-        cle: "montantEnvisage",
-        label: "Montant envisagé (€)",
-        valeur: p.montantEnvisage ? entier(p.montantEnvisage) : "",
-        type: "number",
-      },
     ],
     infos: [
       { label: "Statut commercial", valeur: labelStatutCommercial(p.statutCommercial) },
@@ -388,15 +381,20 @@ export async function modifierChampEntite(
     } else if (cle === "budget") {
       const n = Number(v);
       if (!Number.isFinite(n) || n <= 0) return { ok: false, message: "Budget invalide." };
-      await db.update(projets).set({ budget: String(n) }).where(eq(projets.id, ref.id));
-    } else if (cle === "montantEnvisage") {
-      if (v === "") {
-        await db.update(projets).set({ montantEnvisage: null }).where(eq(projets.id, ref.id));
-      } else {
-        const n = Number(v);
-        if (!Number.isFinite(n) || n < 0) return { ok: false, message: "Montant invalide." };
-        await db.update(projets).set({ montantEnvisage: String(n) }).where(eq(projets.id, ref.id));
+      // Même règle que modifierProjet : le budget ne peut pas passer sous le
+      // total des échéances de recettes déjà saisies (prévues + encaissées).
+      const lignes = await db
+        .select({ montant: encaissements.montant })
+        .from(encaissements)
+        .where(eq(encaissements.projetId, ref.id));
+      const saisi = lignes.reduce((s, l) => s + Number(l.montant), 0);
+      if (n < saisi) {
+        return {
+          ok: false,
+          message: `Le budget ne peut pas être inférieur au total des échéances déjà saisies (${formatEuro(saisi)}).`,
+        };
       }
+      await db.update(projets).set({ budget: String(n) }).where(eq(projets.id, ref.id));
     } else if (cle === "statutCommercial") {
       await db
         .update(projets)

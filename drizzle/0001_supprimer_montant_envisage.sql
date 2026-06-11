@@ -1,0 +1,1 @@
+ALTER TABLE "projets" DROP COLUMN IF EXISTS "montant_envisage";

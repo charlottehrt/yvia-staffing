@@ -28,7 +28,6 @@ type Projet = {
   nom: string;
   budget: string;
   statutCommercial: string;
-  montantEnvisage: string | null;
 };
 
 export function ProjetFormDialog({
@@ -49,7 +48,7 @@ export function ProjetFormDialog({
   const [clientId, setClientId] = useState(projet?.clientId ? String(projet.clientId) : "");
 
   const cle = projet
-    ? `${projet.id}:${projet.nom}:${projet.budget}:${projet.clientId}:${projet.statutCommercial}:${projet.montantEnvisage ?? ""}`
+    ? `${projet.id}:${projet.nom}:${projet.budget}:${projet.clientId}:${projet.statutCommercial}`
     : "new";
 
   return (
@@ -129,18 +128,6 @@ export function ProjetFormDialog({
               name="statutCommercial"
               defaultValue={projet?.statutCommercial ?? "a_qualifier"}
               options={STATUTS_COMMERCIAUX.map((s) => ({ value: s.key, label: s.label }))}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="montantEnvisage">Montant envisagé (€ HT)</Label>
-            <Input
-              id="montantEnvisage"
-              name="montantEnvisage"
-              type="number"
-              min="0"
-              step="1"
-              defaultValue={projet?.montantEnvisage ?? ""}
             />
           </div>
 

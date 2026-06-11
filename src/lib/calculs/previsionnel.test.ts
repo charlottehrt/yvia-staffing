@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  normaliserFiabiliteEcheance,
   resoudreFiabilite,
   probaDe,
   FIABILITE_DEFAUT,
@@ -72,5 +73,27 @@ describe("calculPrevisionnelProjet (exemple de la spec, projet APG)", () => {
       "arisque"
     );
     expect(seul.caPondere).toBe(950); // 1000 × 0,95, pas × 0,25
+  });
+});
+
+describe("normaliserFiabiliteEcheance (saisie du formulaire de recette)", () => {
+  it("accepte un pourcentage 0-100 (stocké en texte, espaces tolérés)", () => {
+    expect(normaliserFiabiliteEcheance("80")).toBe("80");
+    expect(normaliserFiabiliteEcheance(" 37.5 ")).toBe("37.5");
+    expect(normaliserFiabiliteEcheance("0")).toBe("0");
+    expect(normaliserFiabiliteEcheance("100")).toBe("100");
+  });
+
+  it("accepte une ancienne catégorie (rétrocompatibilité)", () => {
+    expect(normaliserFiabiliteEcheance("probable")).toBe("probable");
+  });
+
+  it("rejette tout le reste vers null (la cascade projet/client décide)", () => {
+    expect(normaliserFiabiliteEcheance("")).toBeNull();
+    expect(normaliserFiabiliteEcheance(null)).toBeNull();
+    expect(normaliserFiabiliteEcheance(undefined)).toBeNull();
+    expect(normaliserFiabiliteEcheance("150")).toBeNull();
+    expect(normaliserFiabiliteEcheance("-5")).toBeNull();
+    expect(normaliserFiabiliteEcheance("abc")).toBeNull();
   });
 });

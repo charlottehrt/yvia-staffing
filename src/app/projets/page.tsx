@@ -46,7 +46,6 @@ export default async function PageProjets({
         nom: projets.nom,
         budget: projets.budget,
         statutCommercial: projets.statutCommercial,
-        montantEnvisage: projets.montantEnvisage,
         clientId: projets.clientId,
         clientNom: clients.nom,
         clientFiabilite: clients.fiabiliteDefaut,
@@ -183,7 +182,6 @@ export default async function PageProjets({
                   <TableHead>Projet</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Statut</TableHead>
-                  <TableHead className="text-right">Montant envisagé</TableHead>
                   <TableHead className="text-right">Budget</TableHead>
                   <TableHead className="text-right">Encaissé</TableHead>
                   <TableHead className="text-right">Décaissé</TableHead>
@@ -202,7 +200,6 @@ export default async function PageProjets({
                       clientNom: p.clientNom,
                       budget: p.budget,
                       statutCommercial: p.statutCommercial,
-                      montantEnvisage: p.montantEnvisage,
                       fiabiliteDefaut: p.fiabiliteDefaut,
                       clientFiabilite: p.clientFiabilite,
                       actif: p.actif,

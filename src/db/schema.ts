@@ -117,7 +117,6 @@ export const projets = pgTable("projets", {
   // Suivi CRM simple du sujet commercial.
   // Les projets existants en production seront migrés en "gagne".
   statutCommercial: text("statut_commercial").notNull().default("a_qualifier"),
-  montantEnvisage: numeric("montant_envisage", { precision: 12, scale: 2 }),
 });
 
 // --- JALONS (forfait) : repères datés d'un projet, SANS impact financier ---

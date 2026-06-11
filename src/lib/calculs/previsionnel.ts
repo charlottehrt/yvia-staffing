@@ -33,6 +33,17 @@ export function probaDe(key: Fiabilite): number {
   return PAR_KEY.get(key)?.proba ?? 0;
 }
 
+// Normalise la fiabilité saisie pour une échéance : un pourcentage 0-100
+// (stocké en texte) ou une ancienne catégorie ; sinon null (la cascade
+// projet -> client décidera).
+export function normaliserFiabiliteEcheance(v: string | null | undefined): string | null {
+  const brut = (v ?? "").trim();
+  if (brut === "") return null;
+  if (estFiabilite(brut)) return brut;
+  const n = Number(brut);
+  return Number.isFinite(n) && n >= 0 && n <= 100 ? String(n) : null;
+}
+
 // Fiabilité d'un encaissement = un pourcentage (0 à 100) saisi manuellement,
 // stocké en texte. Renvoie la fraction (0 à 1) utilisée pour pondérer.
 // Rétrocompatible : une ancienne catégorie ("probable"...) retombe sur sa proba ;

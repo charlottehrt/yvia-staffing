@@ -26,7 +26,10 @@ function SheetContent({
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Backdrop
-        className="fixed inset-0 z-50 bg-black/20 duration-150 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+        // forceRender : voile rendu même si le panneau est imbriqué dans un
+        // autre dialog, pour griser ce qui se trouve derrière à chaque niveau.
+        forceRender
+        className="fixed inset-0 z-50 bg-black/40 duration-150 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
       />
       <DialogPrimitive.Popup
         data-slot="sheet-content"

@@ -8,6 +8,13 @@
       "when": 1781197028019,
       "tag": "0000_projets_crm_simple",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781205845423,
+      "tag": "0001_supprimer_montant_envisage",
+      "breakpoints": true
     }
   ]
 }

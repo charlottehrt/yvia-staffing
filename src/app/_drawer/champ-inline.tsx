@@ -4,6 +4,7 @@
 // annulé sur Échap.
 
 import * as React from "react";
+import { Pencil } from "lucide-react";
 
 export function ChampInline({
   label,
@@ -62,9 +63,15 @@ export function ChampInline({
           type="button"
           onClick={ouvrirEdition}
           title="Cliquer pour modifier"
-          className="-mx-1 w-full rounded-md px-1 py-1 text-left text-sm font-medium hover:bg-muted"
+          className="group -mx-1 flex w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-left text-sm font-medium hover:bg-muted"
         >
-          {valeur || <span className="text-muted-foreground">(vide)</span>}
+          <span className="truncate">
+            {valeur || <span className="text-muted-foreground">(vide)</span>}
+          </span>
+          <Pencil
+            aria-hidden
+            className="size-3 shrink-0 text-muted-foreground/60 group-hover:text-muted-foreground"
+          />
         </button>
       )}
     </div>
