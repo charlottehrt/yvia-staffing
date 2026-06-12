@@ -456,7 +456,7 @@ export default async function PagePlanning({
       </div>
 
       {/* Indicateurs du mois affiché */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Indicateur titre="CA prévisionnel" valeur={formatEuro(totalCa)} />
         <Indicateur titre="Coût total" valeur={formatEuro(totalCout)} />
         <Indicateur titre="Marge totale" valeur={formatEuro(totalMarge)} />
@@ -575,7 +575,7 @@ function Indicateur({ titre, valeur }: { titre: string; valeur: string }) {
         <CardTitle className="text-xs font-normal text-muted-foreground">{titre}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="font-display text-3xl">{valeur}</p>
+        <p className="font-display text-2xl sm:text-3xl">{valeur}</p>
       </CardContent>
     </Card>
   );

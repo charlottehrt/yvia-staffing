@@ -148,7 +148,15 @@ export function Sidebar({ nomAffiche, admin }: { nomAffiche: string; admin: bool
       </aside>
 
       {/* --- Barre supérieure mobile / tablette --- */}
-      <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b bg-background px-4 lg:hidden">
+      <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setMenuOuvert(true)}
+          aria-label="Ouvrir le menu"
+          className="-ml-2 flex size-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Menu className="size-5" />
+        </button>
         <Link href="/" className="flex items-center">
           <Image
             src="/logo-yvia.svg"
@@ -159,14 +167,6 @@ export function Sidebar({ nomAffiche, admin }: { nomAffiche: string; admin: bool
             priority
           />
         </Link>
-        <button
-          type="button"
-          onClick={() => setMenuOuvert(true)}
-          aria-label="Ouvrir le menu"
-          className="-mr-2 flex size-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <Menu className="size-5" />
-        </button>
       </header>
 
       {/* --- Panneau de navigation mobile --- */}
