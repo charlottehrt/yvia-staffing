@@ -470,7 +470,8 @@ export function PlanningCalendar({
           }
         }}
       >
-        <DialogContent className="min-h-[34rem] content-start sm:max-w-xl">
+        {/* min() : hauteur stable sur desktop, jamais plus haut que l'écran sur mobile. */}
+        <DialogContent className="min-h-[min(34rem,calc(100dvh-2rem))] content-start sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>
               {projetActif?.nom}
@@ -540,7 +541,7 @@ export function PlanningCalendar({
             ) : (
               <div className="space-y-1">
                 <Label>Type d’événement</Label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {[
                     { value: "encaissement", label: "Encaissement", sous: "recette client" },
                     { value: "decaissement", label: "Décaissement", sous: "coût freelance" },
@@ -731,7 +732,7 @@ function EditeurTarifJour({
       className="space-y-3 rounded-lg border border-border p-3"
     >
       <p className="text-sm font-medium">Tarif de ce jour</p>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <Label htmlFor="cell-achat">TJM achat (€ HT)</Label>
           <Input

@@ -134,7 +134,7 @@ export function ProjetDetailDialog({
         </SheetHeader>
 
         {/* Nom et budget : éditables au clic (le client n'est pas modifiable ici) */}
-        <div className="grid grid-cols-2 gap-3 rounded-lg border border-border p-3">
+        <div className="grid grid-cols-1 gap-3 rounded-lg border border-border p-3 sm:grid-cols-2">
           <ChampInline
             label="Nom du projet"
             valeur={projet.nom}
@@ -146,7 +146,7 @@ export function ProjetDetailDialog({
             type="number"
             onSave={(v) => sauverChamp("budget", v)}
           />
-          <div className="col-span-2 space-y-1">
+          <div className="space-y-1 sm:col-span-2">
             <Label htmlFor={`projet-statut-${projet.id}`}>Statut commercial</Label>
             <Select
               id={`projet-statut-${projet.id}`}
@@ -256,7 +256,7 @@ function LigneEvenement({
 }) {
   const style = STYLES_EVENEMENT[evenement.type];
   return (
-    <div className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5 text-sm">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-border px-2 py-1.5 text-sm">
       <span className="shrink-0 font-medium tabular-nums">{formatDate(evenement.date)}</span>
       <span className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${style.badge}`}>
         {style.label}

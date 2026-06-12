@@ -38,7 +38,7 @@ export function AccepterForm({
           <Label htmlFor="email">Email</Label>
           <Input id="email" value={email} disabled />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="prenom">Prénom</Label>
             <Input id="prenom" name="prenom" defaultValue={prenom} />
@@ -77,7 +77,7 @@ function SqueletteInvitation() {
         <Label>Email</Label>
         <ChampFactice />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label>Prénom</Label>
           <ChampFactice />

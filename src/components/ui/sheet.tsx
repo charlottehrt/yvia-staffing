@@ -10,20 +10,45 @@ import { Button } from "@/components/ui/button";
 import { XIcon } from "lucide-react";
 
 const SHEET_CONTENT_BASE_CLASSNAME =
-  "fixed inset-y-0 right-0 z-50 flex h-full w-full flex-col gap-4 overflow-y-auto bg-popover p-5 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/10 duration-200 outline-none data-open:animate-in data-open:slide-in-from-right data-closed:animate-out data-closed:slide-out-to-right";
+  "fixed inset-y-0 z-50 flex h-full w-full flex-col gap-4 overflow-y-auto bg-popover p-5 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/10 duration-200 outline-none data-open:animate-in data-closed:animate-out";
 
-const SHEET_CONTENT_WIDTH_CLASSNAME = "max-w-2xl";
+type SheetSide = "right" | "left";
+
+// Positionnement + largeur par côté. À droite (défaut) : largeur uniforme des
+// drawers d'entité. À gauche : panneau de navigation mobile, plus étroit.
+const SHEET_CONTENT_SIDE_CLASSNAME: Record<SheetSide, string> = {
+  right: "right-0 data-open:slide-in-from-right data-closed:slide-out-to-right",
+  left: "left-0 data-open:slide-in-from-left data-closed:slide-out-to-left",
+};
+
+const SHEET_CONTENT_WIDTH_CLASSNAME: Record<SheetSide, string> = {
+  right: "max-w-2xl",
+  left: "max-w-72",
+};
 
 type SheetContentClassName = DialogPrimitive.Popup.Props["className"];
 type SheetContentState = DialogPrimitive.Popup.State;
 
-function getSheetContentClassName(className?: SheetContentClassName): SheetContentClassName {
+function getSheetContentClassName(
+  className?: SheetContentClassName,
+  side: SheetSide = "right"
+): SheetContentClassName {
   if (typeof className === "function") {
     return (state: SheetContentState) =>
-      cn(SHEET_CONTENT_BASE_CLASSNAME, className(state), SHEET_CONTENT_WIDTH_CLASSNAME);
+      cn(
+        SHEET_CONTENT_BASE_CLASSNAME,
+        SHEET_CONTENT_SIDE_CLASSNAME[side],
+        className(state),
+        SHEET_CONTENT_WIDTH_CLASSNAME[side]
+      );
   }
 
-  return cn(SHEET_CONTENT_BASE_CLASSNAME, className, SHEET_CONTENT_WIDTH_CLASSNAME);
+  return cn(
+    SHEET_CONTENT_BASE_CLASSNAME,
+    SHEET_CONTENT_SIDE_CLASSNAME[side],
+    className,
+    SHEET_CONTENT_WIDTH_CLASSNAME[side]
+  );
 }
 
 function Sheet({ ...props }: DialogPrimitive.Root.Props) {
@@ -38,8 +63,9 @@ function SheetContent({
   className,
   children,
   showCloseButton = true,
+  side = "right",
   ...props
-}: DialogPrimitive.Popup.Props & { showCloseButton?: boolean }) {
+}: DialogPrimitive.Popup.Props & { showCloseButton?: boolean; side?: SheetSide }) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Backdrop
@@ -50,7 +76,7 @@ function SheetContent({
       />
       <DialogPrimitive.Popup
         data-slot="sheet-content"
-        className={getSheetContentClassName(className)}
+        className={getSheetContentClassName(className, side)}
         {...props}
       >
         {children}

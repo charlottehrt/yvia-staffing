@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hors ligne - Yvia</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "Inter", system-ui, sans-serif;
+        background: #ffffff;
+        color: #0b172b;
+        text-align: center;
+        padding: 24px;
+      }
+      .carte {
+        max-width: 22rem;
+      }
+      svg {
+        width: 48px;
+        height: 72px;
+        margin-bottom: 16px;
+      }
+      h1 {
+        font-size: 1.25rem;
+        margin: 0 0 8px;
+      }
+      p {
+        color: #52698f;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin: 0 0 20px;
+      }
+      button {
+        background: #0571ed;
+        color: #ffffff;
+        border: none;
+        border-radius: 10px;
+        padding: 10px 20px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #0f5bb3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="carte">
+      <svg viewBox="-6.6 -1 40 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M13.416 20.7317L22.9284 4.14604" stroke="#0571ED" stroke-width="3.9025" />
+        <path
+          d="M3.90308 8.04897L13.4788 20.7321M13.4788 20.7321V21.4638M13.4788 20.7321V37.5616"
+          stroke="#0B172B"
+          stroke-width="3.9025"
+        />
+        <circle cx="22.9277" cy="3.90252" r="3.9025" fill="#0571ED" />
+        <circle cx="3.90266" cy="7.80461" r="3.9025" fill="#0B172B" />
+        <circle cx="13.6591" cy="36.0975" r="3.9025" fill="#0B172B" />
+      </svg>
+      <h1>Vous êtes hors ligne</h1>
+      <p>
+        Impossible de joindre le serveur Yvia. Vérifiez votre connexion internet puis réessayez.
+      </p>
+      <button onclick="location.reload()">Réessayer</button>
+    </div>
+  </body>
+</html>

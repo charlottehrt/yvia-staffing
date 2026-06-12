@@ -23,7 +23,11 @@ export async function proxy(req: NextRequest) {
   return NextResponse.next();
 }
 
-// On exclut les assets statiques et le dossier _next.
+// On exclut les assets statiques, le dossier _next et les fichiers PWA
+// (manifest, service worker, page hors-ligne, icônes) qui doivent rester
+// accessibles sans session.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.svg).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|icons/|.*\\.svg).*)",
+  ],
 };

@@ -140,7 +140,7 @@ function DrawerContenu({
         <div className="space-y-5">
           {/* Champs éditables au clic */}
           {detail.champs.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3 rounded-lg border border-border p-3">
+            <div className="grid grid-cols-1 gap-3 rounded-lg border border-border p-3 sm:grid-cols-2">
               {detail.champs.map((champ) => (
                 <ChampInline
                   key={champ.cle}

@@ -10,6 +10,16 @@ describe("SheetContent", () => {
     expect(className).not.toContain("max-w-md");
   });
 
+  test("panneau gauche : positionnement et largeur de navigation mobile", () => {
+    const className = getSheetContentClassName("gap-0 p-0", "left");
+
+    expect(className).toContain("left-0");
+    expect(className).toContain("max-w-72");
+    expect(className).toContain("slide-in-from-left");
+    expect(className).not.toContain("max-w-2xl");
+    expect(className).not.toContain("right-0");
+  });
+
   test("préserve les className fonctionnels de Base UI", () => {
     const className = getSheetContentClassName(() => "max-w-md opacity-100");
 
