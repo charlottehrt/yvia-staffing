@@ -269,19 +269,6 @@ export default async function PagePlanning({
   const couleurDe = (missionId: number): Couleur =>
     PALETTE[idsMissions.indexOf(missionId) % PALETTE.length];
 
-  // Légende : pour chaque mission affichée dans la grille, sa couleur, son nom et son client.
-  const infosMission = new Map<number, { nom: string; clientNom: string }>();
-  for (const m of missionsDispo) infosMission.set(m.id, { nom: m.nom, clientNom: m.clientNom });
-  for (const a of affs)
-    if (!infosMission.has(a.missionId))
-      infosMission.set(a.missionId, { nom: a.missionNom, clientNom: a.clientNom });
-  const legende = idsMissions
-    .map((id) => {
-      const info = infosMission.get(id);
-      return info ? { id, ...info, couleur: couleurDe(id) } : null;
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null);
-
   // Lignes de la grille (une par freelance actif affiché dans le planning).
   // Les freelances masqués gardent leurs sélecteurs, affectations et montants :
   // seule la ligne du calendrier disparaît.
@@ -471,24 +458,8 @@ export default async function PagePlanning({
         </Card>
       ) : (
         <>
-          {/* Légende des couleurs + action, juste au-dessus du calendrier */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {legende.length > 0 ? (
-              <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
-                {legende.map((m) => (
-                  <span key={m.id} className="flex items-center gap-1.5">
-                    <span
-                      className="size-3 shrink-0 rounded-sm"
-                      style={{ backgroundColor: m.couleur.bg }}
-                    />
-                    <span className="font-medium">{m.nom}</span>
-                    <span className="text-muted-foreground">({m.clientNom})</span>
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div />
-            )}
+          {/* Action, juste au-dessus du calendrier */}
+          <div className="flex items-center justify-end">
             <EtendreMoisButton
               annee={annee}
               mois={mois}
