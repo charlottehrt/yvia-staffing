@@ -1,0 +1,10 @@
+{
+  "env": {
+    "CONDUCTOR_PORT": "${HECATON_WEB_PORT}",
+    "CONDUCTOR_WORKSPACE_NAME": "${HECATON_SLUG}"
+  },
+  "setup": "./scripts/worktree-up.sh",
+  "run": "npm run dev",
+  "archive": "./scripts/worktree-down.sh --purge",
+  "previewUrl": "${HECATON_PREVIEW_ORIGIN}"
+}
