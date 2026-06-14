@@ -1,6 +1,18 @@
 import type { NextConfig } from "next";
 
 type CspEnv = Partial<Pick<NodeJS.ProcessEnv, "NODE_ENV" | "VERCEL_ENV">>;
+type HecatonEnv = { HECATON_PREVIEW_ORIGIN?: string };
+
+export function creerAllowedDevOrigins(env?: HecatonEnv): string[] {
+  const origin = (env?.HECATON_PREVIEW_ORIGIN ?? process.env.HECATON_PREVIEW_ORIGIN)?.trim();
+  if (!origin) return [];
+
+  try {
+    return [new URL(origin).host];
+  } catch {
+    return [];
+  }
+}
 
 export function creerCsp(env: CspEnv = process.env): string {
   const vercelLive = env.VERCEL_ENV === "preview";
@@ -38,6 +50,7 @@ export function creerCsp(env: CspEnv = process.env): string {
 }
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: creerAllowedDevOrigins(),
   async headers() {
     const headers = [
       {

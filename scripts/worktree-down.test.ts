@@ -21,6 +21,8 @@ function envWithoutConductor() {
   const env = { ...process.env };
   delete env.CONDUCTOR_PORT;
   delete env.CONDUCTOR_WORKSPACE_NAME;
+  delete env.HECATON_DB;
+  delete env.HECATON_DATABASE_URL;
   return env;
 }
 
@@ -41,6 +43,41 @@ function prepareProject(label: string, envContents = "") {
 }
 
 describe("scripts/worktree-down.sh", () => {
+  it("supprime la base Hecaton avec --purge sans appeler Docker", () => {
+    const projectDir = prepareProject("hecaton");
+    const nodeLog = join(projectDir, "node.log");
+
+    writeExecutable(
+      join(projectDir, "bin", "docker"),
+      `#!/usr/bin/env bash
+echo "docker should not run" >&2
+exit 99
+`
+    );
+    writeExecutable(
+      join(projectDir, "bin", "node"),
+      `#!/usr/bin/env bash
+echo "$*" >> "${nodeLog}"
+exit 0
+`
+    );
+
+    const result = spawnSync("bash", ["scripts/worktree-down.sh", "--purge"], {
+      cwd: projectDir,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        HECATON_DB: "delta_test",
+        HECATON_DATABASE_URL: "postgresql://user:pass@postgres:5432/delta_test",
+        PATH: `${join(projectDir, "bin")}:${process.env.PATH ?? ""}`,
+      },
+    });
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("Suppression de la base Hecaton 'delta_test'");
+    expect(readFileSync(nodeLog, "utf8")).toContain("scripts/hecaton-db.mjs down");
+  });
+
   it("réutilise le port PostgreSQL enregistré dans .env", () => {
     const projectDir = prepareProject("port", 'DB_PORT="6123"\n');
     const dockerLog = join(projectDir, "docker.log");

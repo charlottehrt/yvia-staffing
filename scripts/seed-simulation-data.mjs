@@ -31,6 +31,10 @@ function dernierJourMois(reference, deltaMois = 0) {
   return isoJour(dateUTC(mois.getUTCFullYear(), mois.getUTCMonth(), joursDansMois(mois.getUTCFullYear(), mois.getUTCMonth())));
 }
 
+function dateHeureDansJours(reference, deltaJours) {
+  return new Date(reference.getTime() + deltaJours * MS_JOUR).toISOString();
+}
+
 // Liste des jours ouvrés (lun-ven) sur un intervalle inclusif.
 export function joursOuvres(debutISO, finISO) {
   const dates = [];
@@ -59,20 +63,76 @@ export function construireSimulation(maintenant = new Date()) {
     jourCourant + 8
   );
 
+  const utilisateurs = [
+    {
+      email: "ops@yvia.io",
+      motDePasse: "preview",
+      prenom: "Camille",
+      nom: "Ops",
+      role: "user",
+      actif: true,
+    },
+    {
+      email: "finance@yvia.io",
+      motDePasse: "preview",
+      prenom: "Nora",
+      nom: "Finance",
+      role: "admin",
+      actif: true,
+    },
+  ];
+
+  const invitations = [
+    {
+      token: "preview-invitation-lina",
+      email: "lina.associee@yvia.io",
+      prenom: "Lina",
+      nom: "Moreau",
+      expireLe: dateHeureDansJours(reference, 7),
+      utilisee: false,
+      role: "user",
+    },
+    {
+      token: "preview-invitation-expiree",
+      email: "ancien.invite@yvia.io",
+      prenom: "Noe",
+      nom: "Rousseau",
+      expireLe: dateHeureDansJours(reference, -2),
+      utilisee: false,
+      role: "user",
+    },
+    {
+      token: "preview-invitation-utilisee",
+      email: "compte.cree@yvia.io",
+      prenom: "Maya",
+      nom: "Petit",
+      expireLe: dateHeureDansJours(reference, 5),
+      utilisee: true,
+      role: "admin",
+    },
+  ];
+
   const clients = [
     { nom: "Wenimmo", fiabiliteDefaut: "securise", actif: true },
     { nom: "APG", fiabiliteDefaut: "probable", actif: true },
     { nom: "Delta", fiabiliteDefaut: "incertain", actif: true },
     { nom: "Nova Santé", fiabiliteDefaut: "securise", actif: true },
+    { nom: "Banque Atlas", fiabiliteDefaut: "probable", actif: true },
+    { nom: "GreenOps", fiabiliteDefaut: "incertain", actif: true },
+    { nom: "Studio Kanso", fiabiliteDefaut: "securise", actif: true },
     { nom: "Legacy Corp", fiabiliteDefaut: "arisque", actif: false },
   ];
 
   const freelances = [
-    { prenom: "Maxime", nom: "Dubois", actif: true },
-    { prenom: "Alex", nom: "Martin", actif: true },
-    { prenom: "Paul", nom: "Bernard", actif: true },
-    { prenom: "Sarah", nom: "Nguyen", actif: true },
-    { prenom: "Nina", nom: "Leroy", actif: false },
+    { prenom: "Maxime", nom: "Dubois", actif: true, afficherPlanning: true },
+    { prenom: "Alex", nom: "Martin", actif: true, afficherPlanning: true },
+    { prenom: "Paul", nom: "Bernard", actif: true, afficherPlanning: true },
+    { prenom: "Sarah", nom: "Nguyen", actif: true, afficherPlanning: true },
+    { prenom: "Inès", nom: "Renaud", actif: true, afficherPlanning: true },
+    { prenom: "Hugo", nom: "Lemaire", actif: true, afficherPlanning: true },
+    { prenom: "Chloé", nom: "Garnier", actif: true, afficherPlanning: false },
+    { prenom: "Yanis", nom: "Benali", actif: true, afficherPlanning: true },
+    { prenom: "Nina", nom: "Leroy", actif: false, afficherPlanning: false },
   ];
 
   const missions = [
@@ -84,6 +144,13 @@ export function construireSimulation(maintenant = new Date()) {
     { free: "Paul", client: "Wenimmo", nom: "Audit performance Wenimmo", achat: 550, vente: 800, actif: true },
     { free: "Sarah", client: "Nova Santé", nom: "Portail patient Nova", achat: 520, vente: 820, actif: true },
     { free: "Sarah", client: "APG", nom: "Reporting BI APG", achat: 520, vente: 790, actif: true },
+    { free: "Inès", client: "Banque Atlas", nom: "Conformité KYC Atlas", achat: 620, vente: 930, actif: true },
+    { free: "Inès", client: "GreenOps", nom: "Back-office GreenOps", achat: 620, vente: 900, actif: true },
+    { free: "Hugo", client: "Studio Kanso", nom: "Design system Kanso", achat: 480, vente: 760, actif: true },
+    { free: "Hugo", client: "Wenimmo", nom: "Tunnel acquéreur Wenimmo", achat: 480, vente: 720, actif: true },
+    { free: "Chloé", client: "Nova Santé", nom: "QA portail patient", achat: 430, vente: 650, actif: true },
+    { free: "Yanis", client: "Banque Atlas", nom: "Sécurisation API Atlas", achat: 650, vente: 980, actif: true },
+    { free: "Yanis", client: "Delta", nom: "Audit sécurité Delta", achat: 650, vente: 940, actif: false },
     { free: "Nina", client: "Legacy Corp", nom: "Maintenance Legacy", achat: 430, vente: 650, actif: false },
   ];
 
@@ -94,6 +161,7 @@ export function construireSimulation(maintenant = new Date()) {
       budget: 76000,
       actif: true,
       fiabiliteDefaut: null,
+      statutCommercial: "proposition_envoyee",
       recettes: [
         { date: dateDansMois(reference, -1, 15), montant: 22000, libelle: "Acompte 30%", statut: "encaisse", fiabilite: null },
         { date: dateDansMois(reference, 0, prevuCourant), montant: 24000, libelle: "Jalon V1", statut: "prevu", fiabilite: "80" },
@@ -117,6 +185,7 @@ export function construireSimulation(maintenant = new Date()) {
       budget: 48000,
       actif: true,
       fiabiliteDefaut: "probable",
+      statutCommercial: "en_discussion",
       recettes: [
         { date: dateDansMois(reference, 0, realiseCourant), montant: 10000, libelle: "Acompte", statut: "encaisse", fiabilite: null },
         { date: dateDansMois(reference, 1, 15), montant: 18000, libelle: "Jalon livraison", statut: "prevu", fiabilite: null },
@@ -137,6 +206,7 @@ export function construireSimulation(maintenant = new Date()) {
       budget: 90000,
       actif: true,
       fiabiliteDefaut: "securise",
+      statutCommercial: "gagne",
       recettes: [
         { date: dateDansMois(reference, -2, 25), montant: 30000, libelle: "Acompte cadrage", statut: "encaisse", fiabilite: null },
         { date: dateDansMois(reference, 0, prevuCourant), montant: 30000, libelle: "Lot ingestion", statut: "prevu", fiabilite: "90" },
@@ -158,6 +228,7 @@ export function construireSimulation(maintenant = new Date()) {
       budget: 15000,
       actif: false,
       fiabiliteDefaut: null,
+      statutCommercial: "gagne",
       recettes: [
         { date: dateDansMois(reference, -1, 8), montant: 15000, libelle: "Audit complet", statut: "encaisse", fiabilite: null },
       ],
@@ -168,10 +239,71 @@ export function construireSimulation(maintenant = new Date()) {
         { date: dateDansMois(reference, -1, 10), libelle: "Rapport final" },
       ],
     },
+    {
+      client: "Banque Atlas",
+      nom: "Migration paiements Atlas (forfait)",
+      budget: 120000,
+      actif: true,
+      fiabiliteDefaut: "probable",
+      statutCommercial: "gagne",
+      recettes: [
+        { date: dateDansMois(reference, -1, 28), montant: 35000, libelle: "Acompte signature", statut: "encaisse", fiabilite: null },
+        { date: dateDansMois(reference, 1, 5), montant: 45000, libelle: "Homologation", statut: "prevu", fiabilite: "85" },
+        { date: dateDansMois(reference, 4, 18), montant: 40000, libelle: "Mise en production", statut: "prevu", fiabilite: "65" },
+      ],
+      couts: [
+        { free: "Yanis", date: dateDansMois(reference, 0, realiseCourant), montant: 11000, libelle: "Audit sécurité", statut: "decaisse" },
+        { free: "Inès", date: dateDansMois(reference, 1, 8), montant: 16000, libelle: "Flux KYC", statut: "prevu" },
+        { free: "Paul", date: dateDansMois(reference, 2, 6), montant: 14000, libelle: "Architecture cible", statut: "prevu" },
+      ],
+      jalons: [
+        { date: dateDansMois(reference, 0, realiseCourant), libelle: "Atelier risques" },
+        { date: dateDansMois(reference, 1, 5), libelle: "Homologation interne" },
+        { date: dateDansMois(reference, 4, 18), libelle: "Go-live bancaire" },
+      ],
+    },
+    {
+      client: "GreenOps",
+      nom: "Prototype sobriété GreenOps",
+      budget: 28000,
+      actif: true,
+      fiabiliteDefaut: "incertain",
+      statutCommercial: "a_qualifier",
+      recettes: [
+        { date: dateDansMois(reference, 2, 10), montant: 12000, libelle: "Prototype", statut: "prevu", fiabilite: "45" },
+        { date: dateDansMois(reference, 3, 10), montant: 16000, libelle: "Industrialisation optionnelle", statut: "prevu", fiabilite: "25" },
+      ],
+      couts: [
+        { free: "Inès", date: dateDansMois(reference, 2, 12), montant: 8000, libelle: "Prototype back-office", statut: "prevu" },
+        { free: "Hugo", date: dateDansMois(reference, 2, 15), montant: 5000, libelle: "Maquette produit", statut: "prevu" },
+      ],
+      jalons: [
+        { date: dateDansMois(reference, 2, 10), libelle: "Démo comité innovation" },
+      ],
+    },
+    {
+      client: "Legacy Corp",
+      nom: "Migration ERP Legacy (perdue)",
+      budget: 64000,
+      actif: true,
+      fiabiliteDefaut: "arisque",
+      statutCommercial: "perdu",
+      recettes: [
+        { date: dateDansMois(reference, 1, 30), montant: 12000, libelle: "Acompte annulé", statut: "prevu", fiabilite: "10" },
+      ],
+      couts: [
+        { free: "Nina", date: dateDansMois(reference, 0, realiseCourant), montant: 2500, libelle: "Avant-vente", statut: "decaisse" },
+      ],
+      jalons: [
+        { date: dateDansMois(reference, 0, realiseCourant), libelle: "Go / no-go perdu" },
+      ],
+    },
   ];
 
   return {
     reference: isoJour(reference),
+    utilisateurs,
+    invitations,
     planning: {
       debut: premierJourMois(reference, 0),
       fin: dernierJourMois(reference, 4),

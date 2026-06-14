@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
 # worktree-down.sh : arrête l'environnement de CE workspace.
-#   - arrête et retire les conteneurs + le réseau Docker du workspace
-#   - conserve les données (le volume) par défaut
+#   - dans Hecaton : supprime la base isolée seulement avec --purge
+#   - hors Hecaton : arrête et retire les conteneurs + le réseau Docker du workspace
+#   - conserve les données par défaut
 #
 # Option : --purge pour TOUT supprimer, y compris les données.
 #
@@ -13,6 +14,17 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+if [ -n "${HECATON_DB:-}" ] && [ -n "${HECATON_DATABASE_URL:-}" ]; then
+  if [ "${1:-}" = "--purge" ]; then
+    echo "→ Suppression de la base Hecaton '${HECATON_DB}'..."
+    node scripts/hecaton-db.mjs down
+    echo "✅ Base Hecaton supprimée."
+  else
+    echo "→ Environnement Hecaton : base '${HECATON_DB}' conservée."
+  fi
+  exit 0
+fi
 
 # Mêmes valeurs que worktree-up.sh pour viser le bon projet Docker.
 slugify_compose_name() {
@@ -41,10 +53,18 @@ export COMPOSE_PROJECT_NAME
 
 if [ "${1:-}" = "--purge" ]; then
   echo "→ Arrêt et suppression complète (données incluses) du projet '${COMPOSE_PROJECT_NAME}'..."
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "❌ Docker est introuvable. Hors Hecaton, ce script a besoin de Docker." >&2
+    exit 127
+  fi
   docker compose down -v
   echo "✅ Environnement arrêté et données supprimées."
 else
   echo "→ Arrêt du projet '${COMPOSE_PROJECT_NAME}' (les données sont conservées)..."
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "❌ Docker est introuvable. Hors Hecaton, ce script a besoin de Docker." >&2
+    exit 127
+  fi
   docker compose down
   echo "✅ Environnement arrêté. Données conservées (relancez avec scripts/worktree-up.sh)."
 fi

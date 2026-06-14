@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import nextConfig, { creerCsp } from "./next.config";
+import nextConfig, { creerAllowedDevOrigins, creerCsp } from "./next.config";
 
 async function lireCsp(): Promise<string> {
   const routes = await nextConfig.headers?.();
@@ -21,5 +21,13 @@ describe("next.config Content-Security-Policy", () => {
     expect(csp).toContain("script-src 'self' 'unsafe-inline' https://vercel.live");
     expect(csp).toContain("connect-src 'self' https://vercel.live wss://ws-us3.pusher.com");
     expect(csp).toContain("frame-src https://vercel.live");
+  });
+
+  it("autorise l'origine de preview Hecaton pour les ressources dev Next", () => {
+    expect(
+      creerAllowedDevOrigins({
+        HECATON_PREVIEW_ORIGIN: "https://lima-bx0.hecaton.eplp.fr",
+      })
+    ).toEqual(["lima-bx0.hecaton.eplp.fr"]);
   });
 });

@@ -14,12 +14,10 @@ export async function proxy(req: NextRequest) {
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
-  // Déjà connecté et sur /login : on renvoie vers l'accueil.
-  if (session && pathname === "/login") {
-    const url = req.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
-  }
+  // Ne pas rediriger /login vers / depuis le proxy : ici on ne vérifie que la
+  // signature du cookie, pas sa révocation en base (mot de passe changé, seed de
+  // preview, compte recréé). Un vieux cookie signé peut donc être refusé ensuite
+  // par getSession(); le laisser accéder à /login évite une boucle / ↔ /login.
   return NextResponse.next();
 }
 

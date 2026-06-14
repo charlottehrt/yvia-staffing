@@ -29,6 +29,8 @@ function envWithoutConductor() {
   const env = { ...process.env };
   delete env.CONDUCTOR_PORT;
   delete env.CONDUCTOR_WORKSPACE_NAME;
+  delete env.HECATON_DB;
+  delete env.HECATON_DATABASE_URL;
   return env;
 }
 
@@ -74,6 +76,81 @@ async function findOccupiedPortWithFreeSuccessor() {
 }
 
 describe("scripts/worktree-up.sh", () => {
+  it("utilise la base isolée Hecaton sans démarrer Docker", () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "worktree-up-hecaton-"));
+    tempDirs.push(projectDir);
+    mkdirSync(join(projectDir, "scripts"));
+    mkdirSync(join(projectDir, "bin"));
+
+    writeFileSync(
+      join(projectDir, "scripts", "worktree-up.sh"),
+      readFileSync(join(import.meta.dirname, "worktree-up.sh"), "utf8")
+    );
+    chmodSync(join(projectDir, "scripts", "worktree-up.sh"), 0o755);
+
+    const npmLog = join(projectDir, "npm.log");
+    const nodeLog = join(projectDir, "node.log");
+
+    writeExecutable(
+      join(projectDir, "bin", "docker"),
+      `#!/usr/bin/env bash
+echo "docker should not run" >&2
+exit 99
+`
+    );
+    writeExecutable(
+      join(projectDir, "bin", "npm"),
+      `#!/usr/bin/env bash
+echo "$*" >> "${npmLog}"
+exit 0
+`
+    );
+    writeExecutable(
+      join(projectDir, "bin", "node"),
+      `#!/usr/bin/env bash
+echo "$*" >> "${nodeLog}"
+exit 0
+`
+    );
+    writeExecutable(
+      join(projectDir, "bin", "openssl"),
+      `#!/usr/bin/env bash
+printf 'test-secret'
+`
+    );
+
+    const dbUrl = "postgresql://user:pass@postgres:5432/delta_test";
+    const result = spawnSync("bash", ["scripts/worktree-up.sh"], {
+      cwd: projectDir,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        HECATON_DB: "delta_test",
+        HECATON_DATABASE_URL: dbUrl,
+        DATABASE_URL: "postgresql://wrong:wrong@postgres:5432/hecaton",
+        PORT: "4321",
+        PATH: `${join(projectDir, "bin")}:${process.env.PATH ?? ""}`,
+      },
+    });
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain(".env : DATABASE_URL pointe vers la base Hecaton delta_test");
+    expect(result.stdout).toContain("L'application tournera sur le port 4321");
+
+    const envFile = readFileSync(join(projectDir, ".env"), "utf8");
+    expect(envFile).toContain(`DATABASE_URL="${dbUrl}"`);
+    expect(envFile).toContain(`DATABASE_URL_UNPOOLED="${dbUrl}"`);
+    expect(envFile).not.toContain("DB_PORT=");
+    expect(envFile).not.toContain("hecaton");
+
+    expect(readFileSync(npmLog, "utf8").trim().split("\n")).toEqual([
+      "install --include=dev",
+      "run db:push",
+      "run seed:simulation",
+    ]);
+    expect(readFileSync(nodeLog, "utf8")).toContain("scripts/hecaton-db.mjs up");
+  });
+
   it("skips an occupied Conductor database port", async () => {
     const { blocker, occupiedPort, freePort } = await findOccupiedPortWithFreeSuccessor();
     try {

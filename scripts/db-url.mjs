@@ -1,9 +1,12 @@
 import postgres from "postgres";
 
 export function getDatabaseUrl() {
-  const databaseUrl = process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
+  const databaseUrl =
+    process.env.HECATON_DATABASE_URL ??
+    process.env.DATABASE_URL_UNPOOLED ??
+    process.env.DATABASE_URL;
   if (!databaseUrl) {
-    throw new Error("DATABASE_URL ou DATABASE_URL_UNPOOLED manquant");
+    throw new Error("DATABASE_URL, DATABASE_URL_UNPOOLED ou HECATON_DATABASE_URL manquant");
   }
   return databaseUrl;
 }

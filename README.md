@@ -167,4 +167,5 @@ PORT=3001 npm run dev        # exemple pour lancer un autre worktree à la main
 - `npm run db:push` : appliquer le schéma à la base
 - `npm run db:migrate` : appliquer les migrations versionnées (à privilégier en production Neon existante)
 - `npm run db:studio` : explorer la base dans le navigateur
+- `npm run seed:simulation` : charger un jeu de données complet pour les previews (voir `docs/preview-seed.md`)
 - `npm test` : lancer les tests

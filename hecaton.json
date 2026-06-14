@@ -1,7 +1,10 @@
 {
   "env": {
     "CONDUCTOR_PORT": "${HECATON_WEB_PORT}",
-    "CONDUCTOR_WORKSPACE_NAME": "${HECATON_SLUG}"
+    "CONDUCTOR_WORKSPACE_NAME": "${HECATON_SLUG}",
+    "DATABASE_URL": "${HECATON_DATABASE_URL}",
+    "DATABASE_URL_UNPOOLED": "${HECATON_DATABASE_URL}",
+    "NODE_ENV": "development"
   },
   "setup": "./scripts/worktree-up.sh",
   "run": "npm run dev",

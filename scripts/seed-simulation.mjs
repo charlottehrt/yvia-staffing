@@ -3,6 +3,7 @@
 //
 // Contenu :
 //   - 1 admin de test : admin@yvia.io / admin (surchargeable par env)
+//   - comptes utilisateurs, invitations en attente/expirées/utilisées
 //   - clients et freelances actifs + archivés
 //   - missions actives + inactive
 //   - planning régie du mois courant jusqu'à plusieurs mois futurs
@@ -41,7 +42,7 @@ function grouperPar(items, cle) {
 try {
   const simulation = construireSimulation(new Date());
 
-  // 1) Compte admin de démonstration.
+  // 1) Comptes de démonstration.
   await sql`
     INSERT INTO users (email, password_hash, prenom, nom, actif, role)
     VALUES (${emailAdmin}, ${hasher(motDePasseAdmin)}, ${null}, ${nomAdmin}, ${true}, ${"admin"})
@@ -52,8 +53,34 @@ try {
           actif = true,
           role = 'admin'`;
 
-  // 2) Remise à zéro des données métier.
-  await sql`TRUNCATE jalons, encaissements, decaissements, projets, affectations, missions, freelances, clients RESTART IDENTITY CASCADE`;
+  for (const u of simulation.utilisateurs) {
+    await sql`
+      INSERT INTO users (email, password_hash, prenom, nom, actif, role)
+      VALUES (${u.email}, ${hasher(u.motDePasse)}, ${u.prenom}, ${u.nom}, ${u.actif}, ${u.role})
+      ON CONFLICT (email) DO UPDATE
+        SET password_hash = EXCLUDED.password_hash,
+            prenom = EXCLUDED.prenom,
+            nom = EXCLUDED.nom,
+            actif = EXCLUDED.actif,
+            role = EXCLUDED.role`;
+  }
+
+  // 2) Remise à zéro des données de preview.
+  await sql`TRUNCATE invitations, jalons, encaissements, decaissements, projets, affectations, missions, freelances, clients RESTART IDENTITY CASCADE`;
+
+  for (const invitation of simulation.invitations) {
+    await sql`
+      INSERT INTO invitations (token, email, prenom, nom, expire_le, utilisee, role)
+      VALUES (
+        ${invitation.token},
+        ${invitation.email},
+        ${invitation.prenom},
+        ${invitation.nom},
+        ${invitation.expireLe},
+        ${invitation.utilisee},
+        ${invitation.role}
+      )`;
+  }
 
   // 3) Clients.
   const clients = [];
@@ -70,8 +97,8 @@ try {
   const freelances = [];
   for (const f of simulation.freelances) {
     const [row] = await sql`
-      INSERT INTO freelances (prenom, nom, actif)
-      VALUES (${f.prenom}, ${f.nom}, ${f.actif})
+      INSERT INTO freelances (prenom, nom, actif, afficher_planning)
+      VALUES (${f.prenom}, ${f.nom}, ${f.actif}, ${f.afficherPlanning})
       RETURNING id, prenom`;
     freelances.push(row);
   }
@@ -123,8 +150,15 @@ try {
   // 7) Projets forfaitaires, recettes, coûts et jalons.
   for (const p of simulation.projets) {
     const [projet] = await sql`
-      INSERT INTO projets (client_id, nom, budget, actif, fiabilite_defaut)
-      VALUES (${idClient[p.client]}, ${p.nom}, ${p.budget}, ${p.actif}, ${p.fiabiliteDefaut})
+      INSERT INTO projets (client_id, nom, budget, actif, fiabilite_defaut, statut_commercial)
+      VALUES (
+        ${idClient[p.client]},
+        ${p.nom},
+        ${p.budget},
+        ${p.actif},
+        ${p.fiabiliteDefaut},
+        ${p.statutCommercial}
+      )
       RETURNING id`;
 
     for (const r of p.recettes) {
@@ -156,6 +190,8 @@ try {
 
   console.log("Simulation complète chargée :");
   console.log(`  Admin        : ${emailAdmin} / ${motDePasseAdmin}`);
+  console.log(`  Utilisateurs : ${simulation.utilisateurs.length + 1}`);
+  console.log(`  Invitations  : ${simulation.invitations.length}`);
   console.log(`  Référence    : ${simulation.reference}`);
   console.log(`  Clients      : ${clients.length} (${simulation.clients.filter((c) => !c.actif).length} archivé)`);
   console.log(`  Freelances   : ${freelances.length} (${simulation.freelances.filter((f) => !f.actif).length} inactif)`);

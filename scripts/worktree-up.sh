@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
-# worktree-up.sh : prépare et démarre l'environnement de CE workspace.
-#   - démarre la base PostgreSQL (Docker) sur un port propre au workspace
+# worktree-up.sh : prépare l'environnement de CE workspace.
+#   - dans Hecaton : utilise la base PostgreSQL isolée fournie au workspace
+#   - hors Hecaton : démarre PostgreSQL (Docker) sur un port propre au workspace
 #   - écrit l'adresse de la base dans .env
 #   - installe les dépendances et applique le schéma (crée les tables)
 #
@@ -37,7 +38,44 @@ export COMPOSE_PROJECT_NAME
 # Conductor réserve 10 ports par workspace, à partir de CONDUCTOR_PORT.
 # On garde CONDUCTOR_PORT pour l'application et un des ports suivants pour la base.
 # Hors Conductor (lancement manuel), on retombe sur les ports par défaut.
-APP_PORT="${CONDUCTOR_PORT:-3000}"
+APP_PORT="${PORT:-${CONDUCTOR_PORT:-3000}}"
+
+write_session_secret_if_needed() {
+  if ! grep -q '^SESSION_SECRET=' .env 2>/dev/null; then
+    SECRET="$(openssl rand -hex 32 2>/dev/null || node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
+    echo "SESSION_SECRET=\"${SECRET}\"" >> .env
+    echo "→ .env : SESSION_SECRET généré"
+  fi
+}
+
+if [ -n "${HECATON_DB:-}" ] && [ -n "${HECATON_DATABASE_URL:-}" ]; then
+  HECATON_DB_URL="${HECATON_DATABASE_URL}"
+
+  touch .env
+  grep -v -E '^(DB_PORT|DATABASE_URL|DATABASE_URL_UNPOOLED)=' .env > .env.tmp 2>/dev/null || true
+  echo "DATABASE_URL=\"${HECATON_DB_URL}\"" >> .env.tmp
+  echo "DATABASE_URL_UNPOOLED=\"${HECATON_DB_URL}\"" >> .env.tmp
+  mv .env.tmp .env
+  echo "→ .env : DATABASE_URL pointe vers la base Hecaton ${HECATON_DB}"
+  export DATABASE_URL="${HECATON_DB_URL}"
+  export DATABASE_URL_UNPOOLED="${HECATON_DB_URL}"
+  write_session_secret_if_needed
+
+  echo "→ Installation des dépendances..."
+  npm install --include=dev
+
+  echo "→ Création de la base Hecaton si nécessaire..."
+  node scripts/hecaton-db.mjs up
+
+  echo "→ Création / mise à jour des tables..."
+  npm run db:push
+
+  echo "→ Chargement du jeu de données de preview..."
+  npm run seed:simulation
+
+  echo "✅ Environnement prêt. L'application tournera sur le port ${APP_PORT}."
+  exit 0
+fi
 
 port_is_available_for_this_workspace() {
   local port="$1"
@@ -90,7 +128,7 @@ export DB_PORT
 # --- Écrit DATABASE_URL dans .env (en conservant les autres lignes éventuelles) ---
 DB_URL="postgresql://postgres:postgres@localhost:${DB_PORT}/suivi_marge"
 touch .env
-grep -v -E '^(DB_PORT|DATABASE_URL)=' .env > .env.tmp 2>/dev/null || true
+grep -v -E '^(DB_PORT|DATABASE_URL|DATABASE_URL_UNPOOLED)=' .env > .env.tmp 2>/dev/null || true
 echo "DB_PORT=\"${DB_PORT}\"" >> .env.tmp
 echo "DATABASE_URL=\"${DB_URL}\"" >> .env.tmp
 mv .env.tmp .env
@@ -100,14 +138,15 @@ echo "→ .env : DATABASE_URL pointe vers le port ${DB_PORT}"
 # Chaque workspace a besoin de sa propre valeur, sinon l'application plante au
 # démarrage de l'authentification. On la génère une seule fois puis on la
 # conserve : la régénérer à chaque lancement invaliderait les sessions ouvertes.
-if ! grep -q '^SESSION_SECRET=' .env 2>/dev/null; then
-  SECRET="$(openssl rand -hex 32 2>/dev/null || node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
-  echo "SESSION_SECRET=\"${SECRET}\"" >> .env
-  echo "→ .env : SESSION_SECRET généré"
-fi
+write_session_secret_if_needed
 
 # --- Démarrage de la base ---
 echo "→ Démarrage de PostgreSQL (projet '${COMPOSE_PROJECT_NAME}', port ${DB_PORT})..."
+if ! command -v docker >/dev/null 2>&1; then
+  echo "❌ Docker est introuvable. Hors Hecaton, ce script a besoin de Docker pour lancer PostgreSQL." >&2
+  echo "   Dans Hecaton, vérifiez que HECATON_DB et HECATON_DATABASE_URL sont injectées." >&2
+  exit 127
+fi
 docker compose up -d
 
 # --- Attente que la base accepte les connexions ---
@@ -122,7 +161,7 @@ done
 
 # --- Dépendances + schéma ---
 echo "→ Installation des dépendances..."
-npm install
+npm install --include=dev
 
 echo "→ Création / mise à jour des tables..."
 npm run db:push
