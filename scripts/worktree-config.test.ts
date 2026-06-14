@@ -5,7 +5,9 @@ describe("configuration multi-worktree", () => {
   it("démarre Next sur le port réservé au workspace sans argument Conductor dédié", () => {
     const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 
-    expect(packageJson.scripts.dev).toBe("next dev -p ${PORT:-${CONDUCTOR_PORT:-3000}}");
+    expect(packageJson.scripts.dev).toBe(
+      "NODE_ENV=development next dev -p ${PORT:-${CONDUCTOR_PORT:-3000}}"
+    );
     expect(packageJson.scripts.start).toBe("next start -p ${PORT:-${CONDUCTOR_PORT:-3000}}");
   });
 
