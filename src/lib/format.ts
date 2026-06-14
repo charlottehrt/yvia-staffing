@@ -28,6 +28,24 @@ export function formatDate(dateISO: string | null): string {
   return `${jour}/${mois}/${annee}`;
 }
 
+// Date/heure ISO complète -> "JJ/MM/AAAA à HH:MM" (heure locale). Renvoie "-" si
+// vide. Utilisé pour horodater les commentaires de suivi des tâches.
+export function formatDateHeure(iso: string | null): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  const date = new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(d);
+  const heure = new Intl.DateTimeFormat("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+  return `${date} à ${heure}`;
+}
+
 // Pourcentage, ex : 0.2308 -> "23 %".
 export function formatPourcent(ratio: number): string {
   return new Intl.NumberFormat("fr-FR", {

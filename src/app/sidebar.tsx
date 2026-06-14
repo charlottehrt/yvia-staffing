@@ -20,6 +20,7 @@ import {
   UserCog,
   Building2,
   BarChart3,
+  ListTodo,
   UserCircle,
   LogOut,
   Menu,
@@ -37,6 +38,7 @@ const LIENS: Lien[] = [
   { href: "/projets", label: "Projets", icone: FolderKanban },
   { href: "/freelances", label: "Freelances", icone: Users },
   { href: "/clients", label: "Clients", icone: Building2 },
+  { href: "/taches", label: "Tâches", icone: ListTodo },
   { href: "/statistiques", label: "Pilotage", icone: BarChart3 },
   { href: "/users", label: "Users", icone: UserCog },
 ];

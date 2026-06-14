@@ -167,3 +167,26 @@ export const decaissements = pgTable("decaissements", {
   libelle: text("libelle"), // optionnel
   statut: text("statut").notNull().default("decaisse"), // 'decaisse' | 'prevu'
 });
+
+// --- TÂCHES (gestionnaire de tâches / suivi de sujets) ---
+// Une tâche = un sujet à suivre, identifié par un simple nom. L'avancement se
+// note au fil de l'eau via des commentaires datés (table commentaires_tache).
+// Pas de lien avec les entités financières : c'est un outil de suivi autonome.
+export const taches = pgTable("taches", {
+  id: serial("id").primaryKey(),
+  nom: text("nom").notNull(),
+  termine: boolean("termine").notNull().default(false), // true = clôturée
+  creeLe: text("cree_le").notNull(), // date/heure ISO de création
+});
+
+// --- COMMENTAIRES DE SUIVI (rattachés à une tâche) ---
+// Chaque commentaire note un point d'avancement. Supprimés en cascade avec la
+// tâche pour ne pas laisser de fils orphelins.
+export const commentairesTache = pgTable("commentaires_tache", {
+  id: serial("id").primaryKey(),
+  tacheId: integer("tache_id")
+    .notNull()
+    .references(() => taches.id, { onDelete: "cascade" }),
+  contenu: text("contenu").notNull(),
+  creeLe: text("cree_le").notNull(), // date/heure ISO
+});
