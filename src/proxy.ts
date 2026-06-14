@@ -23,11 +23,14 @@ export async function proxy(req: NextRequest) {
   return NextResponse.next();
 }
 
-// On exclut les assets statiques, le dossier _next et les fichiers PWA
-// (manifest, service worker, page hors-ligne, icônes) qui doivent rester
-// accessibles sans session.
+// On exclut :
+// - les routes API (/api/*) : elles gèrent leur propre authentification (la
+//   route MCP /api/mcp s'appuie sur une clé API en Bearer, pas sur le cookie) ;
+// - les assets statiques, le dossier _next et les fichiers PWA (manifest,
+//   service worker, page hors-ligne, icônes) qui doivent rester accessibles
+//   sans session.
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|icons/|.*\\.svg).*)",
+    "/((?!api/|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|icons/|.*\\.svg).*)",
   ],
 };

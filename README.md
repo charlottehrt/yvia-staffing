@@ -123,6 +123,52 @@ npx vercel --prod
 Après le déploiement, ouvrir `/login` sur l'URL Vercel et se connecter avec le
 compte créé à l'étape précédente.
 
+## Accès MCP (interroger les données depuis une IA)
+
+L'application expose un serveur **MCP** (Model Context Protocol) en **lecture
+seule** : on peut y connecter un client compatible (Claude, etc.) et poser des
+questions sur les freelances, clients, missions (« prestas »), projets au
+forfait, le planning et la marge.
+
+- **Endpoint** (transport Streamable HTTP) : `https://<votre-domaine>/api/mcp`
+- **Authentification** : une clé API en en-tête `Authorization: Bearer <clé>`.
+
+### Générer une clé
+
+Dans l'application : **Paramètres → Accès API (MCP) → Générer une clé**. La clé
+n'est affichée qu'une seule fois (seule son empreinte est stockée). Une clé donne
+accès en lecture à **toutes** les données : ne la partagez pas, révoquez-la si
+besoin depuis la même page.
+
+> La table `api_keys` est créée par la migration `0003_api_keys`. En production
+> Neon, elle s'applique automatiquement via `npm run db:migrate` (workflow
+> GitHub Actions sur `main`). En local : `npm run db:push`.
+
+### Configurer un client
+
+Exemple de configuration (URL + en-tête d'authentification) :
+
+```json
+{
+  "mcpServers": {
+    "yvia-suivi-marge": {
+      "url": "https://<votre-domaine>/api/mcp",
+      "headers": { "Authorization": "Bearer <votre-clé>" }
+    }
+  }
+}
+```
+
+Pour un client qui ne gère pas les en-têtes personnalisés, utiliser le pont
+`npx mcp-remote https://<votre-domaine>/api/mcp --header "Authorization:Bearer <votre-clé>"`.
+
+### Outils disponibles (lecture seule)
+
+`lister_freelances`, `lister_clients`, `lister_missions` (prestas),
+`lister_projets`, `detail_projet` (trésorerie + échéancier), `planning_du_mois`
+(indicateurs CA / coût / marge du mois), `statistiques` (réalisé + prévisionnel
+par mois), `rechercher` (recherche libre par nom).
+
 ## Structure
 
 - `src/app/` : les pages (les écrans que l'utilisateur voit) et le code serveur (API).

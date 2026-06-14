@@ -41,6 +41,23 @@ export const invitations = pgTable("invitations", {
   role: text("role").notNull().default("user"),
 });
 
+// --- CLÉS API (accès programmatique via MCP) ---
+// Une clé API permet à un client MCP de se connecter et d'interroger les
+// données en lecture seule. On ne stocke jamais la clé en clair : seulement son
+// empreinte SHA-256 (tokenHash). Le préfixe sert à identifier la clé dans la
+// liste sans la révéler. La clé appartient à l'utilisateur qui l'a créée.
+export const apiKeys = pgTable("api_keys", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  nom: text("nom").notNull(), // libellé donné par l'utilisateur (ex : "Claude Desktop")
+  prefixe: text("prefixe").notNull(), // début de la clé, affiché dans la liste
+  tokenHash: text("token_hash").notNull().unique(), // empreinte SHA-256 (hex) de la clé complète
+  creeLe: text("cree_le").notNull(), // date/heure ISO de création
+  dernierUsageLe: text("dernier_usage_le"), // date/heure ISO du dernier appel, nul si jamais utilisée
+});
+
 // --- FREELANCES ---
 export const freelances = pgTable("freelances", {
   id: serial("id").primaryKey(), // identifiant unique, généré automatiquement
