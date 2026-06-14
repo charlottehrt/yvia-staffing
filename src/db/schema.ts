@@ -167,3 +167,37 @@ export const decaissements = pgTable("decaissements", {
   libelle: text("libelle"), // optionnel
   statut: text("statut").notNull().default("decaisse"), // 'decaisse' | 'prevu'
 });
+
+// --- CHARGES FIXES (dépenses récurrentes, souvent des abonnements SaaS) ---
+// Une charge porte un montant mensuel récurrent qui s'applique automatiquement
+// à chaque mois entre sa date de début et, si renseignée, sa date de fin
+// (abonnement résilié). Le montant d'un mois donné peut être ajusté ponctuellement
+// via charges_fixes_valeurs (voir ci-dessous).
+export const chargesFixes = pgTable("charges_fixes", {
+  id: serial("id").primaryKey(),
+  libelle: text("libelle").notNull(), // ex : "Notion", "Figma", "Loyer"
+  // Montant récurrent par défaut, en € (par mois). Appliqué à chaque mois actif.
+  montantMensuel: numeric("montant_mensuel", { precision: 12, scale: 2 }).notNull(),
+  dateDebut: date("date_debut").notNull(), // premier mois facturé
+  dateFin: date("date_fin"), // dernier mois facturé (vide = toujours en cours)
+  // Statut manuel : une charge archivée n'apparaît plus dans la grille active.
+  actif: boolean("actif").notNull().default(true),
+});
+
+// --- VALEURS MENSUELLES D'UNE CHARGE FIXE (ajustement ponctuel) ---
+// Une ligne existe seulement quand un mois est saisi explicitement : ce montant
+// remplace alors le montant récurrent pour ce mois précis (ex : facturation
+// annuelle, hausse de tarif, mois non payé à 0). Sans ligne, le mois utilise le
+// montant récurrent de la charge.
+export const chargesFixesValeurs = pgTable(
+  "charges_fixes_valeurs",
+  {
+    id: serial("id").primaryKey(),
+    chargeFixeId: integer("charge_fixe_id")
+      .notNull()
+      .references(() => chargesFixes.id, { onDelete: "cascade" }),
+    mois: text("mois").notNull(), // "AAAA-MM"
+    montant: numeric("montant", { precision: 12, scale: 2 }).notNull(), // € pour ce mois
+  },
+  (t) => [unique("une_valeur_par_charge_et_mois").on(t.chargeFixeId, t.mois)]
+);
